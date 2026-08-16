@@ -197,3 +197,17 @@ footer{text-align:center;color:#918d85;font-size:9px;padding:24px 0 0}
   .method-guide span{grid-row:1/3;margin:0}
   .method-guide small{margin-top:1px}
 }
+
+.channel-card.personal .channel-icon{
+  background:#6b6a65;
+  font-size:27px;
+}
+.account-guide-note{
+  margin:0 0 14px;
+  padding:12px 14px;
+  border-radius:16px 6px 16px 6px;
+  background:#f1eee8;
+  border:1px solid #ddd6cb;
+}
+.account-guide-note strong{display:block;font-size:11px;margin-bottom:3px}
+.account-guide-note span{display:block;font-size:10px;color:#6e6962;line-height:1.45}

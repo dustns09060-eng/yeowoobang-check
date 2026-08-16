@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f4efe8">
   <title>YEOWOOBANG CHECK · 품앗이 누락 확인</title>
-  <link rel="stylesheet" href="./style.css?v=18">
+  <link rel="stylesheet" href="./style.css?v=19">
 </head>
 <body>
   <main id="appMain" class="workspace">
@@ -23,16 +23,26 @@
     <section id="homeScreen" class="home-screen"><div class="test-mode-banner"><strong>하이브리드 테스트 버전</strong><span>인스타 댓글은 API 자동 확인 → 안 되면 캡처 확인으로 전환됩니다.</span></div>
       <div class="home-intro">
         <span>확인할 채널을 선택해주세요</span>
-        <strong>어디에서 품앗이를 진행했나요?</strong>
+        <strong>어떤 방식으로 확인할까요?</strong>
       </div>
 
       <div class="channel-grid">
         <button class="channel-card instagram" data-mode="instagram">
           <div class="channel-icon">◎</div>
           <div class="channel-copy">
-            <span>INSTAGRAM</span>
-            <h2>인스타 댓글 확인</h2>
-            <p>댓글 캡처를 올리면 참여자 명단과 자동 비교</p>
+            <span>PRO · BUSINESS</span>
+            <h2>프로 계정 댓글 자동 확인</h2>
+            <p>프로페셔널·비즈니스 계정은 게시물 링크로 API 자동 확인</p>
+          </div>
+          <div class="channel-arrow">→</div>
+        </button>
+
+        <button class="channel-card personal" data-mode="personal">
+          <div class="channel-icon">👤</div>
+          <div class="channel-copy">
+            <span>PERSONAL ACCOUNT</span>
+            <h2>일반 계정 댓글 확인 도우미</h2>
+            <p>댓글을 끝까지 펼친 뒤 복사 가능한 텍스트 또는 캡처로 확인</p>
           </div>
           <div class="channel-arrow">→</div>
         </button>
@@ -41,7 +51,7 @@
           <div class="channel-icon">♥</div>
           <div class="channel-copy">
             <span>INSTAGRAM LIKE</span>
-            <h2>인스타 좋아요 확인</h2>
+            <h2>좋아요 누락 확인</h2>
             <p>좋아요 목록 캡처를 올리면 참여자와 자동 비교</p>
           </div>
           <div class="channel-arrow">→</div>
@@ -298,7 +308,7 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-  <script src="./config.js?v=18"></script>
-  <script src="./app.js?v=18"></script>
+  <script src="./config.js?v=19"></script>
+  <script src="./app.js?v=19"></script>
 </body>
 </html>
