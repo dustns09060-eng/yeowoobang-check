@@ -514,6 +514,7 @@
 
       const matchedSet=new Set();
       const reviewMap=new Map();
+      let analyzedFrames=0;
 
       for(let i=0;i<times.length;i++){
         const pct=5+(i/times.length)*90;
@@ -522,6 +523,7 @@
         await seekVideo(video,times[i]);
         const canvas=drawVideoFrame(video);
         const result=await worker.recognize(canvas);
+        analyzedFrames++;
         const text=result?.data?.text||'';
 
         const matches=recognizeInstagram(text,parsed.items);
@@ -548,6 +550,10 @@
         // 이미 검사 대상 대부분을 찾았다면 조기 종료
         const expected=parsed.items.filter(x=>!x.autoFreePass).length;
         if(expected>0 && matchedSet.size>=expected) break;
+      }
+
+      if(analyzedFrames===0){
+        throw new Error('영상 프레임을 분석하지 못했습니다. 다른 영상 파일로 다시 시도해주세요.');
       }
 
       videoRecognized=[...matchedSet].sort();
@@ -584,10 +590,10 @@
         $('videoHint').textContent=videoReview.length ? '정확 인식과 확인 필요 후보를 검토한 뒤 누락자 비교를 눌러주세요.' : '인식된 아이디 목록을 확인한 뒤 누락자 비교를 눌러주세요.';
       }
 
-      logLocalEvent('video_collector_done',`${videoRecognized.length} recognized`);
+      logLocalEvent('video_collector_done',`${videoRecognized.length} recognized / ${analyzedFrames} frames`);
     }catch(e){
       setVideoProgress('영상 분석 실패',100);
-      $('videoHint').textContent=String(e.message||e);
+      $('videoHint').textContent='오류: '+String(e.message||e);
       logLocalEvent('video_collector_error',e.message||e);
     }finally{
       if(worker){
