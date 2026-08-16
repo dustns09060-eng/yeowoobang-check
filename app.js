@@ -816,8 +816,6 @@
     status.className='notice';status.innerHTML=`<strong>${unique.length}명 벤 링크 검사 대상 생성</strong><br>좋아요 목록 캡처를 추가한 뒤 분석을 시작해주세요.`;
   }
 
-  if(sessionStorage.getItem('yeowoobang_authorized')==='1'){$('loginGate').classList.add('hidden');$('appMain').classList.remove('hidden');}
-  $('loginBtn').addEventListener('click',verifyPassword);$('accessPassword').addEventListener('keydown',e=>{if(e.key==='Enter')verifyPassword();});
   $('moneCommentImages').addEventListener('change',e=>{moneCommentFiles=Array.from(e.target.files||[]);renderMoneCommentFiles();});
   $('moneExtractBtn').addEventListener('click',extractMoneTargets);
   $('moneMemberMapping').value=localStorage.getItem('yeowoobang_mone_mapping')||'';
