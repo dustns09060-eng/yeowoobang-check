@@ -199,14 +199,22 @@
       p.warning ? warnings.push(p) : items.push(p);
     });
 
-    const seen = new Set();
-    const unique = items.filter(x=>{
-      if(seen.has(x.norm)) return false;
-      seen.add(x.norm);
-      return true;
+    // 같은 아이디가 여러 일반 품앗이방에 있으면 참여 횟수만큼 댓글이 필요합니다.
+    // 소굴방 명단은 이 입력에 넣지 않는 방식으로 사용합니다.
+    const grouped = new Map();
+    items.forEach(x=>{
+      if(!grouped.has(x.norm)){
+        grouped.set(x.norm,{...x, requiredCount:1, entries:[x]});
+      }else{
+        const g=grouped.get(x.norm);
+        g.requiredCount += 1;
+        g.entries.push(x);
+        // 한 줄이라도 프패면 해당 아이디는 프패로 처리
+        g.autoFreePass = g.autoFreePass || x.autoFreePass;
+      }
     });
 
-    return {items:unique,warnings};
+    return {items:[...grouped.values()],warnings,totalEntries:items.length};
   }
 
   function parseIdList(text){
@@ -223,14 +231,14 @@
     if(!mode) return;
 
     const p = parseParticipants($('participants').value);
-    $('recognizedCount').textContent = p.items.length;
-    $('recognizedCountMirror').textContent = p.items.length+'명 인식';
+    $('recognizedCount').textContent = p.totalEntries ?? p.items.length;
+    $('recognizedCountMirror').textContent = (p.totalEntries ?? p.items.length)+'건 인식';
     $('warningCount').textContent = p.warnings.length;
 
     $('extractedList').innerHTML = p.items.length
       ? p.items.map(x=>{
           const isAdmin = mode==='instagram' && INSTAGRAM_ADMIN_IDS.includes(normalizeIg(x.target));
-          return `<span>${mode==='instagram'?'@':''}${esc(x.target)}${isAdmin?'<em class="admin-badge">운영진</em>':''}${x.autoFreePass?'<em>프패</em>':''}</span>`;
+          return `<span>${mode==='instagram'?'@':''}${esc(x.target)}${x.requiredCount>1?`<em class="count-badge">${x.requiredCount}회</em>`:''}${isAdmin?'<em class="admin-badge">운영진</em>':''}${x.autoFreePass?'<em>프패</em>':''}</span>`;
         }).join('')
       : '<small>추출된 대상이 없습니다.</small>';
 
@@ -247,15 +255,15 @@
     if(!parsed.items.length) throw new Error('참여자 명단을 먼저 입력해주세요.');
 
     const normalizer = mode === 'instagram' ? normalizeIg : normalizeBlog;
-    const recognized = new Set(recognizedNames.map(normalizer).filter(Boolean));
+    const recognizedCounts = new Map();
+    recognizedNames.map(normalizer).filter(Boolean).forEach(id=>{
+      recognizedCounts.set(id,(recognizedCounts.get(id)||0)+1);
+    });
 
     const excluded = parseIdList($('excludeIds').value);
-
-    // Instagram 모드에서는 운영진을 자동 제외
     if(mode === 'instagram'){
       INSTAGRAM_ADMIN_IDS.forEach(id => excluded.add(normalizeIg(id)));
     }
-
     const owner = normalizer($('ownerId').value);
     if(owner) excluded.add(owner);
 
@@ -266,13 +274,21 @@
     const active = parsed.items.filter(x=>!excluded.has(x.norm));
     const freePassItems = active.filter(x=>freePass.has(x.norm));
     const checkTargets = active.filter(x=>!freePass.has(x.norm));
-    const commented = checkTargets.filter(x=>recognized.has(x.norm));
-    const missing = checkTargets.filter(x=>!recognized.has(x.norm));
+
+    const completed = [];
+    const missing = [];
+    checkTargets.forEach(x=>{
+      const required = x.requiredCount || 1;
+      const found = recognizedCounts.get(x.norm) || 0;
+      const shortage = Math.max(0,required-found);
+      const row={...x,requiredCount:required,foundCount:found,shortage};
+      (shortage===0?completed:missing).push(row);
+    });
 
     currentMissing = missing.map(x=>x.target);
 
-    $('statParticipants').textContent = parsed.items.length;
-    $('statCommented').textContent = commented.length;
+    $('statParticipants').textContent = parsed.totalEntries ?? parsed.items.length;
+    $('statCommented').textContent = completed.length;
     $('statMissing').textContent = missing.length;
     $('statExcluded').textContent = excludedItems.length;
     $('statFreePass').textContent = freePassItems.length;
@@ -287,8 +303,9 @@
             <div>
               <small>${x.no?x.no+'. ':''}${esc(x.nickname||'')}</small>
               <strong>${mode==='instagram'?'@':''}${esc(x.target)}</strong>
+              <small class="count-detail">필요 ${x.requiredCount}회 · 확인 ${x.foundCount}회 · ${x.shortage}회 부족</small>
             </div>
-            <span>미확인</span>
+            <span>${x.shortage}회 부족</span>
           </div>`).join('');
 
     $('resultCard').classList.remove('hidden');
@@ -328,68 +345,41 @@
   }
 
   function recognizeInstagram(text,items){
-    const lower = String(text||'').toLowerCase()
-      .replace(/[|]/g,'l')
-      .replace(/\s*([._])\s*/g,'$1');
+    const lines=String(text||'').toLowerCase().split(/\r?\n/);
+    const counts=new Map(items.map(p=>[p.norm,0]));
 
-    // username 후보를 넓게 수집
-    const raw = [...lower.matchAll(/@?([._a-z0-9][._a-z0-9]{1,29})/g)]
-      .map(m=>normalizeIg(m[1]));
+    for(const line0 of lines){
+      const line=line0.replace(/[|]/g,'l').replace(/\s*([._])\s*/g,'$1');
+      const raw=[...line.matchAll(/@?([._a-z0-9][._a-z0-9]{1,29})/g)].map(m=>normalizeIg(m[1]));
+      const rawSet=new Set(raw);
+      const skels=[...new Set(raw.map(igSkeleton).filter(Boolean))];
+      const cans=[...new Set(raw.map(igOcrCanonical).filter(Boolean))];
+      const allSkel=igSkeleton(line), allCan=igOcrCanonical(line);
 
-    const rawSet = new Set(raw);
-    const skeletons = [...new Set(raw.map(igSkeleton).filter(Boolean))];
-    const canonicalSkeletons = [...new Set(raw.map(igOcrCanonical).filter(Boolean))];
-
-    const allSkeleton = igSkeleton(lower);
-    const allCanonical = igOcrCanonical(lower);
-    const matched = new Set();
-
-    items.forEach(p=>{
-      const targetCanonical = igOcrCanonical(p.norm);
-
-      // 1. 정확한 username
-      if(rawSet.has(p.norm)){
-        matched.add(p.norm);
-        return;
-      }
-
-      // 2. 점/밑줄을 제외한 정확 비교
-      if(p.skeleton.length>=4 && (skeletons.includes(p.skeleton) || allSkeleton.includes(p.skeleton))){
-        matched.add(p.norm);
-        return;
-      }
-
-      // 3. OCR에서 1/l, 0/o 혼동을 보정한 비교
-      if(targetCanonical.length>=4 &&
-         (canonicalSkeletons.includes(targetCanonical) || allCanonical.includes(targetCanonical))){
-        matched.add(p.norm);
-        return;
-      }
-
-      // 4. 긴 아이디는 1~2자 OCR 오독 허용
-      if(p.skeleton.length>=6){
-        let best=99;
-        for(const s of skeletons){
-          if(Math.abs(s.length-p.skeleton.length)>2) continue;
-          best=Math.min(best,levenshtein(p.skeleton,s));
-          if(best===0) break;
+      items.forEach(p=>{
+        let hit=false;
+        const pc=igOcrCanonical(p.norm);
+        if(rawSet.has(p.norm)) hit=true;
+        else if(p.skeleton.length>=4 && (skels.includes(p.skeleton)||allSkel.includes(p.skeleton))) hit=true;
+        else if(pc.length>=4 && (cans.includes(pc)||allCan.includes(pc))) hit=true;
+        else if(p.skeleton.length>=6){
+          let best=99,bestc=99;
+          for(const s of skels){
+            if(Math.abs(s.length-p.skeleton.length)<=2) best=Math.min(best,levenshtein(p.skeleton,s));
+          }
+          for(const s of cans){
+            if(Math.abs(s.length-pc.length)<=2) bestc=Math.min(bestc,levenshtein(pc,s));
+          }
+          const threshold=p.skeleton.length>=11?2:1;
+          if(best<=threshold||bestc<=threshold) hit=true;
         }
-
-        let bestCanonical=99;
-        for(const s of canonicalSkeletons){
-          if(Math.abs(s.length-targetCanonical.length)>2) continue;
-          bestCanonical=Math.min(bestCanonical,levenshtein(targetCanonical,s));
-          if(bestCanonical===0) break;
-        }
-
-        const threshold=p.skeleton.length>=11?2:1;
-        if(best<=threshold || bestCanonical<=threshold){
-          matched.add(p.norm);
-        }
-      }
-    });
-
-    return matched;
+        // 댓글 화면에서 한 댓글 작성자의 아이디는 한 줄에 한 번만 카운트
+        if(hit) counts.set(p.norm,(counts.get(p.norm)||0)+1);
+      });
+    }
+    const out=[];
+    counts.forEach((n,id)=>{ for(let i=0;i<n;i++) out.push(id); });
+    return out;
   }
 
   function recognizeNaver(text,items){
@@ -482,7 +472,7 @@
         }catch(_){}
       }
 
-      const allMatched = new Set();
+      const allMatched = [];
 
       for(let i=0;i<selectedFiles.length;i++){
         setProgress(`${i+1}/${selectedFiles.length}장 읽는 중`,(i/selectedFiles.length)*100);
@@ -495,7 +485,7 @@
           ? recognizeNaver(text,parsed.items)
           : recognizeInstagram(text,parsed.items);
 
-        matched.forEach(x=>allMatched.add(x));
+        matched.forEach(x=>allMatched.push(x));
 
         setProgress(`${i+1}/${selectedFiles.length}장 완료`,((i+1)/selectedFiles.length)*100);
       }

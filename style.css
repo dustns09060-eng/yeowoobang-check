@@ -107,3 +107,6 @@ footer{text-align:center;color:#918d85;font-size:9px;padding:24px 0 0}
   border-radius:999px;
   margin-left:5px;
 }
+
+.id-cloud em.count-badge{color:#8a5b12;background:#fff1c9;padding:2px 6px;border-radius:999px;margin-left:5px}
+.count-detail{display:block!important;margin-top:5px;color:rgba(255,255,255,.72)}
