@@ -1,6 +1,5 @@
 (() => {
   const $ = id => document.getElementById(id);
-  const cfg = window.YEOWOOBANG_CONFIG || {};
 
   let mode = null;
   let currentMissing = [];

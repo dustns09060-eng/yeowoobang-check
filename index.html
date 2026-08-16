@@ -8,19 +8,7 @@
   <link rel="stylesheet" href="./style.css?v=100">
 </head>
 <body>
-  <section id="loginGate" class="login-gate">
-    <div class="login-card">
-      <div class="login-logo">🦊</div>
-      <div class="eyebrow">YEOWOOBANG PRIVATE TOOL</div>
-      <h1>여우방 전용 프로그램</h1>
-      <p>접속 비밀번호를 입력해주세요.</p>
-      <input id="accessPassword" type="password" autocomplete="current-password" placeholder="비밀번호">
-      <button id="loginBtn" class="run-btn">접속하기</button>
-      <div id="loginMessage" class="login-message"></div>
-    </div>
-  </section>
-
-  <main id="appMain" class="workspace hidden">
+  <main id="appMain" class="workspace">
 
     <header class="hero">
       <div class="hero-mark">🦊</div>
@@ -32,7 +20,7 @@
       <div class="hero-badge">BETA</div>
     </header>
 
-    <section id="homeScreen" class="home-screen">
+    <section id="homeScreen" class="home-screen"><div class="test-mode-banner"><strong>비밀번호 없는 기능 테스트 버전</strong><span>기능 확인용으로만 사용해주세요.</span></div>
       <div class="home-intro">
         <span>확인할 채널을 선택해주세요</span>
         <strong>어디에서 품앗이를 진행했나요?</strong>
@@ -284,7 +272,6 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-  <script src="./config.js?v=100"></script>
   <script src="./app.js?v=100"></script>
 </body>
 </html>
