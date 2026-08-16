@@ -27,7 +27,7 @@
       username:candidate,
       usernameNorm:normalize(candidate),
       usernameSkeleton:skeleton(candidate),
-      autoFreePass:/프배/.test(body)
+      autoFreePass:/프패/.test(body)
     };
   }
 
@@ -49,7 +49,7 @@
     $('warningCount').textContent=p.warnings.length;
 
     $('extractedList').innerHTML=p.items.length
-      ? p.items.map(x=>`<span>@${esc(x.username)}${x.autoFreePass?'<em>프배</em>':''}</span>`).join('')
+      ? p.items.map(x=>`<span>@${esc(x.username)}${x.autoFreePass?'<em>프패</em>':''}</span>`).join('')
       : '<small>추출된 아이디가 없습니다.</small>';
 
     if(p.warnings.length){
