@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f4efe8">
   <title>YEOWOOBANG CHECK · 품앗이 누락 확인</title>
-  <link rel="stylesheet" href="./style.css?v=100">
+  <link rel="stylesheet" href="./style.css?v=16">
 </head>
 <body>
   <main id="appMain" class="workspace">
@@ -14,13 +14,13 @@
       <div class="hero-mark">🦊</div>
       <div class="hero-copy">
         <div class="eyebrow">YEOWOOBANG TOOL</div>
-        <h1>품앗이 누락 확인 <small class="version-tag">v1.0 RC</small></h1>
+        <h1>품앗이 누락 확인</h1>
         <p>인스타그램과 네이버 블로그를 한 곳에서 확인해요.</p>
       </div>
       <div class="hero-badge">BETA</div>
     </header>
 
-    <section id="homeScreen" class="home-screen"><div class="test-mode-banner"><strong>비밀번호 없는 기능 테스트 버전</strong><span>기능 확인용으로만 사용해주세요.</span></div>
+    <section id="homeScreen" class="home-screen"><div class="test-mode-banner"><strong>하이브리드 테스트 버전</strong><span>인스타 댓글은 API 자동 확인 → 안 되면 캡처 확인으로 전환됩니다.</span></div>
       <div class="home-intro">
         <span>확인할 채널을 선택해주세요</span>
         <strong>어디에서 품앗이를 진행했나요?</strong>
@@ -68,7 +68,7 @@
         </button>
       </div>
 
-      <div class="home-note"><b>정식 배포 후보</b><span>OCR 인식 0명일 때 전원 누락 처리 금지 · 운영진/프패 자동 제외 · 비밀번호 접속</span></div><div class="home-note">
+      <div class="home-note">
         <b>공통 기능</b>
         <span>댓글·좋아요·블로그 캡처 분석 · 프패/운영진 자동 제외</span>
       </div>
@@ -163,6 +163,19 @@
             </div>
           </div>
 
+          <div id="hybridApiBox" class="hybrid-api-box hidden">
+            <div class="hybrid-label">PRO 계정 자동 확인</div>
+            <strong>게시물 링크로 먼저 자동 확인</strong>
+            <p>프로페셔널 계정은 Meta API로 댓글을 먼저 불러옵니다. 자동 조회가 안 되면 아래 캡처 방식으로 바로 확인할 수 있어요.</p>
+            <input id="hybridPostUrl" type="url" inputmode="url" placeholder="https://www.instagram.com/p/...">
+            <button id="hybridApiBtn" class="run-btn api-run" type="button">API로 댓글 자동 확인</button>
+            <div id="hybridApiStatus" class="hybrid-status"></div>
+          </div>
+
+          <div id="captureFallbackTitle" class="fallback-title hidden">
+            <span>또는</span><strong>댓글 캡처로 확인</strong>
+          </div>
+
           <label class="dropzone" for="commentImages">
             <span class="camera">＋</span>
             <div>
@@ -230,11 +243,6 @@
         <button id="rerunFromOcrBtn" class="secondary-btn">수정된 결과로 다시 비교</button>
       </section>
 
-      <div id="safetyNotice" class="safety-notice hidden">
-        <strong>자동 판정 보류</strong>
-        <span id="safetyNoticeText"></span>
-      </div>
-
       <section id="resultCard" class="result-board hidden">
         <div class="result-header">
           <div>
@@ -272,6 +280,7 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-  <script src="./app.js?v=100"></script>
+  <script src="./config.js?v=16"></script>
+  <script src="./app.js?v=16"></script>
 </body>
 </html>

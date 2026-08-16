@@ -1,5 +1,6 @@
 (() => {
   const $ = id => document.getElementById(id);
+  const cfg = window.YEOWOOBANG_CONFIG || {};
 
   let mode = null;
   let currentMissing = [];
@@ -110,6 +111,13 @@
     $('ocrHint').textContent = c.ocrHint;
     $('likeRosterBox').classList.toggle('hidden', mode !== 'like');
     $('moneWorkflowBox').classList.toggle('hidden', mode !== 'mone');
+    $('hybridApiBox').classList.toggle('hidden', mode !== 'instagram');
+    $('captureFallbackTitle').classList.toggle('hidden', mode !== 'instagram');
+    if(mode === 'instagram'){
+      $('captureTitle').textContent='댓글 확인';
+      $('captureHelp').textContent='API 자동 확인 또는 댓글 캡처 중 편한 방법을 사용하세요.';
+    }
+
 
     const resultHeading = document.querySelector('.missing-title h3');
     const resultLabel = document.querySelector('.result-header h2');
@@ -226,16 +234,78 @@
     }
 
     const unique=[...new Map(found.map(x=>[normalizeIg(x.id),x])).values()];
-    if(unique.length===0){
-      status.className='notice warning';
-      status.innerHTML='<strong>참여자를 인식하지 못했습니다.</strong><br>카톡 캡처와 등록 명단을 확인해주세요. 기존 참여 명단은 유지합니다.';
-      return;
-    }
     $('participants').value=unique.map((x,i)=>`${i+1}. ${x.nickname} / ${x.id}`).join('\n');
     updateParsedPreview();
 
     status.className='notice';
     status.innerHTML=`<strong>${unique.length}명 참여자 생성 완료</strong><br>카톡에서 잘린 아이디 대신 등록 명단의 전체 Instagram 아이디로 변환했어요.`;
+  }
+
+
+  async function backendApi(params){
+    if(!cfg.API_URL) throw new Error('Apps Script API 주소가 설정되지 않았습니다.');
+    const url=new URL(cfg.API_URL);
+    Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,String(v)));
+    url.searchParams.set('_',Date.now());
+
+    const res=await fetch(url.toString(),{method:'GET',redirect:'follow'});
+    const text=await res.text();
+
+    try{
+      return JSON.parse(text);
+    }catch(e){
+      throw new Error('API 응답을 읽지 못했습니다. Apps Script 배포 상태를 확인해주세요.');
+    }
+  }
+
+  async function runHybridApiCheck(){
+    if(mode!=='instagram') return;
+
+    const parsed=parseParticipants($('participants').value);
+    if(!parsed.items.length){
+      alert('참여자 명단을 먼저 입력해주세요.');
+      return;
+    }
+
+    const postUrl=String($('hybridPostUrl').value||'').trim();
+    if(!/^https:\/\/(www\.)?instagram\.com\/(p|reel)\/[^/?#]+/i.test(postUrl)){
+      alert('Instagram 게시물 링크를 확인해주세요.');
+      return;
+    }
+
+    const btn=$('hybridApiBtn');
+    const status=$('hybridApiStatus');
+    btn.disabled=true;
+    btn.textContent='API 확인 중...';
+    status.className='hybrid-status checking';
+    status.textContent='Instagram 댓글을 자동으로 불러오고 있어요.';
+
+    try{
+      const d=await backendApi({action:'comments',postUrl});
+
+      if(d.ok && Array.isArray(d.comments) && d.comments.length>0){
+        const names=d.comments.map(c=>c.username).filter(Boolean);
+        status.className='hybrid-status success';
+        status.textContent=`자동 조회 성공 · 댓글 ${names.length}개 확인`;
+        runComparison(names,`Instagram API 자동 확인 · ${postUrl}`);
+        return;
+      }
+
+      if(d.ok && Number(d.instagramCommentCount||d.commentCount||0)===0){
+        status.className='hybrid-status warning';
+        status.textContent='API 기준 댓글이 0개입니다. 실제 댓글이 있다면 아래 캡처 방식으로 확인해주세요.';
+        return;
+      }
+
+      status.className='hybrid-status fallback';
+      status.innerHTML=`자동 조회를 사용할 수 없어요.<br><b>${d.message||'Meta API가 댓글 목록을 반환하지 않았습니다.'}</b><br>아래 댓글 캡처 방식으로 확인해주세요.`;
+    }catch(e){
+      status.className='hybrid-status fallback';
+      status.innerHTML=`API 자동 확인에 실패했어요.<br><b>${String(e.message||e)}</b><br>아래 댓글 캡처 방식으로 확인할 수 있어요.`;
+    }finally{
+      btn.disabled=false;
+      btn.textContent='API로 댓글 자동 확인';
+    }
   }
 
   function parseParticipantLine(line, lineNo){
@@ -402,23 +472,7 @@
     }
   }
 
-
-  function showSafetyStop(message){
-    $('resultCard')?.classList.add('hidden');
-    if($('safetyNotice')){
-      $('safetyNoticeText').textContent = message;
-      $('safetyNotice').classList.remove('hidden');
-      $('safetyNotice').scrollIntoView({behavior:'smooth',block:'center'});
-    }
-  }
-
-  function clearSafetyStop(){
-    $('safetyNotice')?.classList.add('hidden');
-    if($('safetyNoticeText')) $('safetyNoticeText').textContent='';
-  }
-
   function runComparison(recognizedNames, sourceLabel){
-    clearSafetyStop();
     const parsed = parseParticipants($('participants').value);
     if(!parsed.items.length) throw new Error('참여자 명단을 먼저 입력해주세요.');
 
@@ -675,23 +729,6 @@
 
       lastRecognized = [...allMatched].sort();
 
-      if(lastRecognized.length === 0 && parsed.items.length > 0){
-        $('captureMatchedCount').textContent = '0';
-        $('ocrResultCount').textContent = '0명';
-        $('ocrUsernames').value = '';
-        $('ocrResultFold').classList.remove('hidden');
-        setProgress('인식 실패 · 자동 판정 보류',100);
-
-        const label = mode === 'naver'
-          ? '네이버 블로그 닉네임을 한 명도 인식하지 못했습니다.'
-          : (mode === 'like' || mode === 'mone')
-            ? '좋아요 목록에서 Instagram 아이디를 한 명도 인식하지 못했습니다.'
-            : '댓글 화면에서 Instagram 아이디를 한 명도 인식하지 못했습니다.';
-
-        showSafetyStop(label + ' 전원을 누락자로 처리하지 않았습니다. 캡처를 더 선명하게 다시 올리거나 인식 결과를 직접 확인해주세요.');
-        return;
-      }
-
       $('captureMatchedCount').textContent = lastRecognized.length;
       $('ocrResultCount').textContent = lastRecognized.length+'명';
 
@@ -731,13 +768,11 @@
   }
 
   async function copyMissing(){
-    const prefix = mode === 'instagram' ? '@' : '';
+    const prefix = (mode === 'instagram' || mode === 'like' || mode === 'mone') ? '@' : '';
     const text = currentMissing.map(x=>prefix+x).join('\n');
 
     if(!text) return alert('복사할 누락자가 없습니다.');
 
-    const ok = confirm(`${currentMissing.length}명의 누락자를 복사합니다.\nOCR 인식 결과를 한 번 확인하셨나요?`);
-    if(!ok) return;
     await navigator.clipboard.writeText(text);
     alert(`${currentMissing.length}명 복사했습니다.`);
   }
@@ -752,8 +787,11 @@
     });
 
     if($('commentImages')) $('commentImages').value='';
+    if($('hybridPostUrl')) $('hybridPostUrl').value='';
+    if($('hybridApiStatus')) { $('hybridApiStatus').textContent=''; $('hybridApiStatus').className='hybrid-status'; }
 
-    ['ocrProgressWrap','ocrResultFold','resultCard','idDrawer','parseWarningsWrap','safetyNotice'].forEach(id=>{
+
+    ['ocrProgressWrap','ocrResultFold','resultCard','idDrawer','parseWarningsWrap'].forEach(id=>{
       $(id)?.classList.add('hidden');
     });
 
@@ -769,21 +807,6 @@
       const key = mode === 'naver' ? 'yeowoobang_naver_owner' : (mode === 'like' ? 'yeowoobang_like_owner' : (mode === 'mone' ? 'yeowoobang_mone_owner' : 'yeowoobang_instagram_owner'));
       $('ownerId').value = localStorage.getItem(key) || ((mode==='instagram'||mode==='like'||mode==='mone')?'tlso_94':'');
     }
-  }
-
-  async function verifyPassword(){
-    const password=$('accessPassword').value;
-    const msg=$('loginMessage');
-    if(!password){msg.textContent='비밀번호를 입력해주세요.';return;}
-    if(!cfg.API_URL){msg.textContent='서버 주소가 설정되지 않았습니다.';return;}
-    $('loginBtn').disabled=true;$('loginBtn').textContent='확인 중...';
-    try{
-      const url=new URL(cfg.API_URL);url.searchParams.set('action','verify_password');url.searchParams.set('password',password);url.searchParams.set('_',Date.now());
-      const res=await fetch(url.toString(),{method:'GET',redirect:'follow'});const data=await res.json();
-      if(data.ok&&data.authorized){sessionStorage.setItem('yeowoobang_authorized','1');$('loginGate').classList.add('hidden');$('appMain').classList.remove('hidden');msg.textContent='';}
-      else msg.textContent='비밀번호가 맞지 않습니다.';
-    }catch(e){msg.textContent='접속 확인에 실패했습니다.';}
-    finally{$('loginBtn').disabled=false;$('loginBtn').textContent='접속하기';}
   }
 
   function renderMoneCommentFiles(){
@@ -807,11 +830,6 @@
       }
     }
     const unique=[...new Map(found.map(x=>[normalizeIg(x.id),x])).values()];
-    if(unique.length===0){
-      status.className='notice warning';
-      status.innerHTML='<strong>참여자를 인식하지 못했습니다.</strong><br>카톡 캡처와 등록 명단을 확인해주세요. 기존 참여 명단은 유지합니다.';
-      return;
-    }
     $('participants').value=unique.map((x,i)=>`${i+1}. ${x.nickname} / ${x.id}`).join('\n');renderParsed();
     status.className='notice';status.innerHTML=`<strong>${unique.length}명 벤 링크 검사 대상 생성</strong><br>좋아요 목록 캡처를 추가한 뒤 분석을 시작해주세요.`;
   }
@@ -848,6 +866,7 @@
     $('captureMatchedCount').textContent='0';
   });
 
+  $('hybridApiBtn').addEventListener('click',runHybridApiCheck);
   $('captureCheckBtn').addEventListener('click',()=>runCaptureCheck().catch(e=>alert(e.message)));
 
   $('rerunFromOcrBtn').addEventListener('click',()=>{
