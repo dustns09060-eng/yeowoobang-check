@@ -32,19 +32,33 @@
   const isIg = s => /^[a-z0-9._]{1,30}$/i.test(s||'');
 
   function configForMode(){
+    if(mode === 'collector'){
+      return {
+        title:'대량 댓글 수집 도우미',
+        eyebrow:'LARGE ROOM COLLECTOR',
+        placeholder:'이 기능은 댓글 100개 이상 방을 위한 수집 도우미 확장용입니다.',
+        listHelp:'현재 웹 버전에서는 캡처 확인을 사용해주세요.',
+        captureHelp:'대량 댓글 수집 도우미는 별도 모바일 보조 기능으로 준비 중입니다.',
+        ownerLabel:'Instagram 아이디',
+        ownerPlaceholder:'@example',
+        ownerHelp:'현재는 안내 화면만 제공됩니다.',
+        ocrHint:'대량 댓글 수집 기능은 아직 활성화되지 않았습니다.'
+      };
+    }
+
     if(mode === 'personal'){
       return {
-        title:'일반 계정 댓글 확인 도우미',
+        title:'댓글 캡처 확인',
         eyebrow:'PERSONAL ACCOUNT COMMENT CHECK',
         placeholder:`1. 대박 / uju____like
 2. 유별 / tlso_94
 3. 토끼맘프패 / rabbit_mom`,
-        listHelp:'참여자 명단을 붙여넣고 댓글을 끝까지 펼친 뒤 복사 가능한 텍스트 또는 캡처를 사용하세요.',
-        captureHelp:'모바일 앱에서는 댓글 작성자 아이디가 보이도록 캡처해서 올리는 방법을 추천해요.',
+        listHelp:'계정 종류와 상관없이 참여자 명단을 붙여넣고 댓글 작성자 아이디가 보이도록 캡처해주세요.',
+        captureHelp:'PC·모바일 모두 댓글 작성자 아이디가 보이도록 캡처해서 올려주세요. 여러 장을 한 번에 선택할 수 있어요.',
         ownerLabel:'내 Instagram 아이디',
         ownerPlaceholder:'@tlso_94',
         ownerHelp:'내 계정과 운영진은 자동 제외',
-        ocrHint:'일반 계정은 Meta API 대신 복사·붙여넣기 또는 캡처로 확인합니다.'
+        ocrHint:'일반 계정은 Meta API 대신 댓글 화면 캡처에서 작성자 아이디를 인식해 참여 명단과 비교합니다.'
       };
     }
 
@@ -100,7 +114,7 @@
       title:'인스타 댓글 확인',
       eyebrow:'INSTAGRAM CHECK',
       placeholder:`1. 대박 / uju____like\n2. 유별 / tlso_94\n3. 토끼맘프패 / rabbit_mom\n\n또는\n@fox_mom\n@rabbit_mom`,
-      listHelp:'번호 · 닉네임 · Instagram 아이디 형식',
+      listHelp:'참여자 명단을 붙여넣고 게시물 링크로 댓글을 자동 확인합니다.',
       captureHelp:'댓글 작성자 Instagram 아이디가 보이게 여러 장 선택',
       ownerLabel:'내 Instagram 아이디',
       ownerPlaceholder:'@tlso_94',
@@ -127,24 +141,25 @@
     $('ocrHint').textContent = c.ocrHint;
     $('likeRosterBox').classList.toggle('hidden', mode !== 'like');
     $('moneWorkflowBox').classList.toggle('hidden', mode !== 'mone');
+    const isCollector = mode === 'collector';
+    document.querySelectorAll('.collector-only-note').forEach(el=>el.remove());
+    if(isCollector){
+      const panel=document.createElement('div');
+      panel.className='collector-only-note';
+      panel.innerHTML='<strong>대량 댓글 수집 도우미는 준비 중입니다.</strong><span>댓글 100개 이상 방에서 캡처 장수를 줄이기 위한 별도 수집 기능으로 연결할 예정이에요. 현재는 일반 댓글 캡처 확인을 이용해주세요.</span>';
+      document.querySelector('.channel-work')?.prepend(panel);
+    }
+
     $('hybridApiBox').classList.toggle('hidden', mode !== 'instagram');
-    $('pasteCommentBox').classList.toggle('hidden', !(mode === 'instagram' || mode === 'personal'));
-    $('instagramMethodGuide').classList.toggle('hidden', !(mode === 'instagram' || mode === 'personal'));
-    $('captureFallbackTitle').classList.toggle('hidden', !(mode === 'instagram' || mode === 'personal'));
+    $('instagramMethodGuide').classList.add('hidden');
+    $('captureFallbackTitle').classList.toggle('hidden', mode !== 'instagram');
     if(mode === 'instagram'){
-      $('captureTitle').textContent='댓글 확인';
-      $('captureHelp').textContent='프로 계정은 API 자동 확인이 우선이고, 안 되면 복사·붙여넣기 또는 캡처로 확인하세요.';
+      $('captureTitle').textContent='댓글 캡처 대체 확인';
+      $('captureHelp').textContent='API 자동 확인이 안 될 때 댓글 작성자 아이디가 보이도록 캡처해서 확인하세요.';
     }
     if(mode === 'personal'){
-      $('captureTitle').textContent='일반 계정 댓글 확인';
-      $('captureHelp').textContent='댓글을 끝까지 펼친 뒤, 복사가 가능하면 붙여넣기 / 모바일 앱에서는 캡처를 추천해요.';
-      const apiGuide = $('instagramMethodGuide');
-      if(apiGuide){
-        apiGuide.innerHTML = `
-          <div><span>📱</span><b>모바일 인스타 앱</b><small>댓글을 모두 펼친 뒤 캡처해서 확인</small></div>
-          <div><span>💻</span><b>PC · 모바일 웹</b><small>댓글 복사가 되면 붙여넣기로 확인</small></div>
-          <div><span>🧩</span><b>댓글 수집 도우미</b><small>현재는 복사·캡처 방식으로 지원</small></div>`;
-      }
+      $('captureTitle').textContent='댓글 캡처';
+      $('captureHelp').textContent='댓글 작성자 아이디가 보이도록 캡처해주세요. 댓글이 많으면 여러 장을 한 번에 올려도 돼요.';
     }
 
 
@@ -310,7 +325,8 @@
     status.textContent='Instagram 댓글을 자동으로 불러오고 있어요.';
 
     try{
-      const d=await backendApi({action:'comments',postUrl});
+      const operationId=makeOperationId();
+      const d=await backendApi({action:'comments',postUrl,operationId});
 
       if(d.ok && Array.isArray(d.comments) && d.comments.length>0){
         const names=d.comments.map(c=>c.username).filter(Boolean);
@@ -330,6 +346,7 @@
       status.innerHTML=`자동 조회를 사용할 수 없어요.<br><b>${d.message||'Meta API가 댓글 목록을 반환하지 않았습니다.'}</b><br>아래 댓글 캡처 방식으로 확인해주세요.`;
     }catch(e){
       status.className='hybrid-status fallback';
+      logLocalEvent('api_error',e.message||e);
       status.innerHTML=`API 자동 확인에 실패했어요.<br><b>${String(e.message||e)}</b><br>아래 댓글 캡처 방식으로 확인할 수 있어요.`;
     }finally{
       btn.disabled=false;
@@ -338,70 +355,18 @@
   }
 
 
-  function recognizeInstagramFromPastedText(text, items){
-    const rawText=String(text||'');
-    if(!rawText.trim()) return [];
 
-    // 붙여넣은 텍스트는 OCR보다 정확하므로 참여 명단에 있는 username을 직접 찾는 방식을 우선 사용
-    const lower=rawText.toLowerCase()
-      .replace(/\s*([._])\s*/g,'$1');
 
-    const found=[];
-
-    items.forEach(p=>{
-      const username=p.norm;
-      const escaped=username.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-
-      // @아이디 또는 경계가 있는 아이디만 인정해서 댓글 본문 속 우연한 문자열 매칭을 줄임
-      const re=new RegExp(`(?:^|[^a-z0-9._])@?${escaped}(?=$|[^a-z0-9._])`,'gmi');
-      const matches=lower.match(re);
-      if(matches && matches.length){
-        for(let i=0;i<matches.length;i++) found.push(username);
-        return;
-      }
-
-      // 점/밑줄이 복사 과정에서 이상하게 벌어진 경우 보정
-      const targetSkel=igSkeleton(username);
-      if(targetSkel.length>=5){
-        const lines=lower.split(/\r?\n/);
-        lines.forEach(line=>{
-          const lineSkel=igSkeleton(line);
-          if(lineSkel.includes(targetSkel)) found.push(username);
-        });
-      }
-    });
-
-    return found;
+  function makeOperationId(){
+    return 'yb_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8);
   }
 
-  function analyzePastedComments(){
-    if(mode!=='instagram') return;
-
-    const parsed=parseParticipants($('participants').value);
-    if(!parsed.items.length){
-      alert('참여자 명단을 먼저 입력해주세요.');
-      return;
-    }
-
-    const text=String($('pastedComments').value||'');
-    if(!text.trim()){
-      alert('복사한 댓글 내용을 붙여넣어주세요.');
-      return;
-    }
-
-    const recognized=recognizeInstagramFromPastedText(text,parsed.items);
-    const uniqueCount=new Set(recognized).size;
-    const status=$('pasteAnalyzeStatus');
-
-    if(recognized.length===0){
-      status.className='hybrid-status fallback';
-      status.textContent='참여 명단과 일치하는 Instagram 아이디를 찾지 못했어요. 복사된 내용에 아이디가 포함되어 있는지 확인하거나 캡처 방식으로 확인해주세요.';
-      return;
-    }
-
-    status.className='hybrid-status success';
-    status.textContent=`붙여넣기 분석 완료 · ${uniqueCount}명 / ${recognized.length}회 확인`;
-    runComparison(recognized,'Instagram 댓글 복사·붙여넣기 확인');
+  function logLocalEvent(type, detail){
+    try{
+      const rows=JSON.parse(localStorage.getItem('yeowoobang_local_events')||'[]');
+      rows.push({at:new Date().toISOString(),type,detail:String(detail||'').slice(0,180)});
+      localStorage.setItem('yeowoobang_local_events',JSON.stringify(rows.slice(-30)));
+    }catch(e){}
   }
 
   function parseParticipantLine(line, lineNo){
@@ -779,6 +744,10 @@
   }
 
   async function runCaptureCheck(){
+    if(mode==='collector'){
+      alert('대량 댓글 수집 도우미는 아직 준비 중입니다. 현재는 댓글 캡처 확인 메뉴를 이용해주세요.');
+      return;
+    }
     const parsed = parseParticipants($('participants').value);
     if(!parsed.items.length) throw new Error('참여자 명단을 먼저 입력해주세요.');
     if(!selectedFiles.length) throw new Error('댓글 캡처를 한 장 이상 선택해주세요.');
@@ -885,8 +854,6 @@
     if($('commentImages')) $('commentImages').value='';
     if($('hybridPostUrl')) $('hybridPostUrl').value='';
     if($('hybridApiStatus')) { $('hybridApiStatus').textContent=''; $('hybridApiStatus').className='hybrid-status'; }
-    if($('pastedComments')) $('pastedComments').value='';
-    if($('pasteAnalyzeStatus')) { $('pasteAnalyzeStatus').textContent=''; $('pasteAnalyzeStatus').className='hybrid-status'; }
 
 
     ['ocrProgressWrap','ocrResultFold','resultCard','idDrawer','parseWarningsWrap'].forEach(id=>{
@@ -965,12 +932,7 @@
   });
 
   $('hybridApiBtn').addEventListener('click',runHybridApiCheck);
-  $('analyzePastedBtn').addEventListener('click',analyzePastedComments);
-  $('clearPastedBtn').addEventListener('click',()=>{
-    $('pastedComments').value='';
-    $('pasteAnalyzeStatus').textContent='';
-    $('pasteAnalyzeStatus').className='hybrid-status';
-  });
+
   $('captureCheckBtn').addEventListener('click',()=>runCaptureCheck().catch(e=>alert(e.message)));
 
   $('rerunFromOcrBtn').addEventListener('click',()=>{

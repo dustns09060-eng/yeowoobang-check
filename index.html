@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f4efe8">
   <title>YEOWOOBANG CHECK · 품앗이 누락 확인</title>
-  <link rel="stylesheet" href="./style.css?v=19">
+  <link rel="stylesheet" href="./style.css?v=22">
 </head>
 <body>
   <main id="appMain" class="workspace">
@@ -20,7 +20,14 @@
       <div class="hero-badge">BETA</div>
     </header>
 
-    <section id="homeScreen" class="home-screen"><div class="test-mode-banner"><strong>하이브리드 테스트 버전</strong><span>인스타 댓글은 API 자동 확인 → 안 되면 캡처 확인으로 전환됩니다.</span></div>
+    <section id="homeScreen" class="home-screen">
+      <div class="service-base-banner">
+        <div>
+          <strong>2,000명+ 사용 대비 베이스</strong>
+          <span>회원은 캡처 확인 · 관리자는 API 자동 확인 · 대량 댓글은 수집 도우미 확장 예정</span>
+        </div>
+        <span class="service-chip">SERVICE BASE</span>
+      </div><div class="test-mode-banner"><strong>하이브리드 테스트 버전</strong><span>인스타 댓글은 API 자동 확인 → 안 되면 캡처 확인으로 전환됩니다.</span></div>
       <div class="home-intro">
         <span>확인할 채널을 선택해주세요</span>
         <strong>어떤 방식으로 확인할까요?</strong>
@@ -30,9 +37,9 @@
         <button class="channel-card instagram" data-mode="instagram">
           <div class="channel-icon">◎</div>
           <div class="channel-copy">
-            <span>PRO · BUSINESS</span>
-            <h2>프로 계정 댓글 자동 확인</h2>
-            <p>프로페셔널·비즈니스 계정은 게시물 링크로 API 자동 확인</p>
+            <span>ADMIN ONLY</span>
+            <h2>관리자 댓글 자동 확인</h2>
+            <p>API가 연결된 관리자 계정만 게시물 링크로 자동 확인</p>
           </div>
           <div class="channel-arrow">→</div>
         </button>
@@ -40,14 +47,24 @@
         <button class="channel-card personal" data-mode="personal">
           <div class="channel-icon">👤</div>
           <div class="channel-copy">
-            <span>PERSONAL ACCOUNT</span>
-            <h2>일반 계정 댓글 확인 도우미</h2>
-            <p>댓글을 끝까지 펼친 뒤 복사 가능한 텍스트 또는 캡처로 확인</p>
+            <span>FOR EVERYONE</span>
+            <h2>댓글 캡처 확인</h2>
+            <p>계정 종류 상관없이 댓글 작성자 아이디가 보이게 캡처해서 확인</p>
           </div>
           <div class="channel-arrow">→</div>
         </button>
 
-        <button class="channel-card like" data-mode="like">
+                <button class="channel-card collector" data-mode="collector">
+          <div class="channel-icon">↕</div>
+          <div class="channel-copy">
+            <span>LARGE ROOM</span>
+            <h2>대량 댓글 수집 도우미</h2>
+            <p>댓글 100개 이상 방을 위한 수집 기능 · 현재 준비 중</p>
+          </div>
+          <div class="channel-arrow">→</div>
+        </button>
+
+<button class="channel-card like" data-mode="like">
           <div class="channel-icon">♥</div>
           <div class="channel-copy">
             <span>INSTAGRAM LIKE</span>
@@ -80,7 +97,7 @@
 
       <div class="home-note">
         <b>공통 기능</b>
-        <span>댓글·좋아요·블로그 캡처 분석 · 프패/운영진 자동 제외</span>
+        <span>댓글 캡처 · 좋아요 캡처 · 모네방 · 블로그 · 프패/운영진 자동 제외</span>
       </div>
     </section>
 
@@ -174,9 +191,9 @@
           </div>
 
           <div id="hybridApiBox" class="hybrid-api-box hidden">
-            <div class="hybrid-label">PRO 계정 자동 확인</div>
-            <strong>게시물 링크로 먼저 자동 확인</strong>
-            <p>프로페셔널 계정은 Meta API로 댓글을 먼저 불러옵니다. 자동 조회가 안 되면 아래 캡처 방식으로 바로 확인할 수 있어요.</p>
+            <div class="hybrid-label">관리자 전용</div>
+            <strong>게시물 링크로 댓글 자동 확인</strong>
+            <p>API가 연결된 관리자 계정에서만 사용할 수 있어요. 자동 조회가 안 되면 댓글 캡처 확인을 사용해주세요.</p>
             <input id="hybridPostUrl" type="url" inputmode="url" placeholder="https://www.instagram.com/p/...">
             <button id="hybridApiBtn" class="run-btn api-run" type="button">API로 댓글 자동 확인</button>
             <div id="hybridApiStatus" class="hybrid-status"></div>
@@ -187,19 +204,6 @@
             <div><span>📱</span><b>모바일 인스타 앱</b><small>댓글 캡처해서 확인</small></div>
             <div><span>💻</span><b>PC · 모바일 웹</b><small>복사가 되면 댓글 붙여넣기</small></div>
           </div>
-
-          <div id="pasteCommentBox" class="paste-comment-box hidden">
-            <div class="hybrid-label">PC · 복사 가능한 환경</div>
-            <strong>댓글 복사해서 붙여넣기</strong>
-            <p><b>모바일 인스타 앱에서는 댓글 전체 복사가 잘 안 될 수 있어요.</b><br>PC나 모바일 웹처럼 댓글 복사가 가능한 환경에서만 사용해주세요. 모바일 앱에서는 아래 <b>댓글 캡처</b> 방식이 가장 편해요.</p>
-            <textarea id="pastedComments" rows="8" placeholder="@user_aaa 댓글 내용&#10;@user.bbb 완료했어요&#10;@user_ccc 잘 보고 갑니다"></textarea>
-            <div class="paste-actions">
-              <button id="analyzePastedBtn" class="run-btn paste-run" type="button">붙여넣은 댓글 분석</button>
-              <button id="clearPastedBtn" class="secondary-btn" type="button">내용 지우기</button>
-            </div>
-            <div id="pasteAnalyzeStatus" class="hybrid-status"></div>
-          </div>
-
           <div id="captureFallbackTitle" class="fallback-title hidden">
             <span>또는</span><strong>댓글 캡처로 확인</strong>
           </div>
@@ -305,10 +309,16 @@
     </section>
 
     <footer>YEOWOOBANG CHECK · 캡처 기반 품앗이 확인</footer>
+  
+    <section class="service-note">
+      <strong>운영 원칙</strong>
+      <p>일반 회원의 캡처는 브라우저에서 분석하고, 관리자 API 토큰은 서버 측에서만 관리하는 구조를 기준으로 합니다.</p>
+    </section>
+
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-  <script src="./config.js?v=19"></script>
-  <script src="./app.js?v=19"></script>
+  <script src="./config.js?v=22"></script>
+  <script src="./app.js?v=22"></script>
 </body>
 </html>

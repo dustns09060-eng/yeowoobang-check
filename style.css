@@ -145,28 +145,7 @@ footer{text-align:center;color:#918d85;font-size:9px;padding:24px 0 0}
 .fallback-title{display:flex;align-items:center;gap:8px;margin:7px 0 10px}.fallback-title:before,.fallback-title:after{content:"";height:1px;background:#d9d1c7;flex:1}
 .fallback-title span{font-size:9px;color:#999188}.fallback-title strong{font-size:11px;color:#514d47}
 
-.paste-comment-box{
-  margin-bottom:14px;
-  padding:15px;
-  border-radius:20px 7px 20px 7px;
-  background:#fff8f3;
-  border:1px solid #efd8cb;
-}
-.paste-comment-box>strong{display:block;font-size:15px}
-.paste-comment-box>p{margin:5px 0 10px;color:#72685f;font-size:11px;line-height:1.5}
-.paste-comment-box textarea{
-  background:#fff;
-  border:1px solid #ead8ce;
-  min-height:150px;
-  resize:vertical;
-}
-.paste-actions{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:8px}
-.paste-run{margin-top:0;background:#2e4d43}
-.paste-actions .secondary-btn{width:auto;min-width:92px;padding:0 12px}
-@media(max-width:520px){
-  .paste-actions{grid-template-columns:1fr}
-  .paste-actions .secondary-btn{width:100%}
-}
+
 
 .method-guide{
   display:grid;
@@ -211,3 +190,69 @@ footer{text-align:center;color:#918d85;font-size:9px;padding:24px 0 0}
 }
 .account-guide-note strong{display:block;font-size:11px;margin-bottom:3px}
 .account-guide-note span{display:block;font-size:10px;color:#6e6962;line-height:1.45}
+
+/* v20: 일반 계정은 캡처 중심 */
+.channel-card.personal .channel-copy p{font-weight:600}
+
+.channel-card.instagram{
+  position:relative;
+}
+.channel-card.instagram:after{
+  content:"관리자";
+  position:absolute;
+  top:14px;
+  right:14px;
+  padding:4px 7px;
+  border-radius:999px;
+  background:#203f35;
+  color:#fff;
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:.05em;
+}
+.channel-card.personal{
+  border:2px solid #204a3d;
+}
+
+.service-base-banner{
+  margin:0 0 16px;
+  padding:14px 15px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  border:1px solid #c9d7d0;
+  background:#eef4f0;
+  border-radius:18px 7px 18px 7px;
+}
+.service-base-banner strong{display:block;font-size:12px;color:#1f4b3d}
+.service-base-banner span{display:block;margin-top:3px;font-size:10px;line-height:1.45;color:#667069}
+.service-chip{
+  flex:none;
+  padding:5px 8px!important;
+  border-radius:999px;
+  background:#1f4b3d;
+  color:#fff!important;
+  font-size:8px!important;
+  font-weight:900;
+  letter-spacing:.06em;
+}
+.channel-card.collector .channel-icon{background:#5e695f;color:#fff}
+.collector-only-note{
+  margin:0 0 14px;
+  padding:14px;
+  border:1px dashed #b8b2a8;
+  border-radius:16px 6px 16px 6px;
+  background:#f7f4ef;
+}
+.collector-only-note strong{display:block;font-size:13px;margin-bottom:4px}
+.collector-only-note span{display:block;font-size:10px;line-height:1.5;color:#777169}
+.service-note{
+  max-width:760px;
+  margin:12px auto 24px;
+  padding:14px 18px;
+  border-top:1px solid rgba(31,75,61,.18);
+  color:#6d6a64;
+}
+.service-note strong{font-size:10px;color:#1f4b3d}
+.service-note p{margin:5px 0 0;font-size:9px;line-height:1.55}
