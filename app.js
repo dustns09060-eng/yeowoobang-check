@@ -112,10 +112,12 @@
     $('likeRosterBox').classList.toggle('hidden', mode !== 'like');
     $('moneWorkflowBox').classList.toggle('hidden', mode !== 'mone');
     $('hybridApiBox').classList.toggle('hidden', mode !== 'instagram');
+    $('pasteCommentBox').classList.toggle('hidden', mode !== 'instagram');
+    $('instagramMethodGuide').classList.toggle('hidden', mode !== 'instagram');
     $('captureFallbackTitle').classList.toggle('hidden', mode !== 'instagram');
     if(mode === 'instagram'){
       $('captureTitle').textContent='댓글 확인';
-      $('captureHelp').textContent='API 자동 확인 또는 댓글 캡처 중 편한 방법을 사용하세요.';
+      $('captureHelp').textContent='모바일에서는 댓글 작성자 아이디가 보이도록 캡처해서 올리는 방법을 추천해요.';
     }
 
 
@@ -306,6 +308,73 @@
       btn.disabled=false;
       btn.textContent='API로 댓글 자동 확인';
     }
+  }
+
+
+  function recognizeInstagramFromPastedText(text, items){
+    const rawText=String(text||'');
+    if(!rawText.trim()) return [];
+
+    // 붙여넣은 텍스트는 OCR보다 정확하므로 참여 명단에 있는 username을 직접 찾는 방식을 우선 사용
+    const lower=rawText.toLowerCase()
+      .replace(/\s*([._])\s*/g,'$1');
+
+    const found=[];
+
+    items.forEach(p=>{
+      const username=p.norm;
+      const escaped=username.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+
+      // @아이디 또는 경계가 있는 아이디만 인정해서 댓글 본문 속 우연한 문자열 매칭을 줄임
+      const re=new RegExp(`(?:^|[^a-z0-9._])@?${escaped}(?=$|[^a-z0-9._])`,'gmi');
+      const matches=lower.match(re);
+      if(matches && matches.length){
+        for(let i=0;i<matches.length;i++) found.push(username);
+        return;
+      }
+
+      // 점/밑줄이 복사 과정에서 이상하게 벌어진 경우 보정
+      const targetSkel=igSkeleton(username);
+      if(targetSkel.length>=5){
+        const lines=lower.split(/\r?\n/);
+        lines.forEach(line=>{
+          const lineSkel=igSkeleton(line);
+          if(lineSkel.includes(targetSkel)) found.push(username);
+        });
+      }
+    });
+
+    return found;
+  }
+
+  function analyzePastedComments(){
+    if(mode!=='instagram') return;
+
+    const parsed=parseParticipants($('participants').value);
+    if(!parsed.items.length){
+      alert('참여자 명단을 먼저 입력해주세요.');
+      return;
+    }
+
+    const text=String($('pastedComments').value||'');
+    if(!text.trim()){
+      alert('복사한 댓글 내용을 붙여넣어주세요.');
+      return;
+    }
+
+    const recognized=recognizeInstagramFromPastedText(text,parsed.items);
+    const uniqueCount=new Set(recognized).size;
+    const status=$('pasteAnalyzeStatus');
+
+    if(recognized.length===0){
+      status.className='hybrid-status fallback';
+      status.textContent='참여 명단과 일치하는 Instagram 아이디를 찾지 못했어요. 복사된 내용에 아이디가 포함되어 있는지 확인하거나 캡처 방식으로 확인해주세요.';
+      return;
+    }
+
+    status.className='hybrid-status success';
+    status.textContent=`붙여넣기 분석 완료 · ${uniqueCount}명 / ${recognized.length}회 확인`;
+    runComparison(recognized,'Instagram 댓글 복사·붙여넣기 확인');
   }
 
   function parseParticipantLine(line, lineNo){
@@ -789,6 +858,8 @@
     if($('commentImages')) $('commentImages').value='';
     if($('hybridPostUrl')) $('hybridPostUrl').value='';
     if($('hybridApiStatus')) { $('hybridApiStatus').textContent=''; $('hybridApiStatus').className='hybrid-status'; }
+    if($('pastedComments')) $('pastedComments').value='';
+    if($('pasteAnalyzeStatus')) { $('pasteAnalyzeStatus').textContent=''; $('pasteAnalyzeStatus').className='hybrid-status'; }
 
 
     ['ocrProgressWrap','ocrResultFold','resultCard','idDrawer','parseWarningsWrap'].forEach(id=>{
@@ -867,6 +938,12 @@
   });
 
   $('hybridApiBtn').addEventListener('click',runHybridApiCheck);
+  $('analyzePastedBtn').addEventListener('click',analyzePastedComments);
+  $('clearPastedBtn').addEventListener('click',()=>{
+    $('pastedComments').value='';
+    $('pasteAnalyzeStatus').textContent='';
+    $('pasteAnalyzeStatus').className='hybrid-status';
+  });
   $('captureCheckBtn').addEventListener('click',()=>runCaptureCheck().catch(e=>alert(e.message)));
 
   $('rerunFromOcrBtn').addEventListener('click',()=>{

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f4efe8">
   <title>YEOWOOBANG CHECK · 품앗이 누락 확인</title>
-  <link rel="stylesheet" href="./style.css?v=16">
+  <link rel="stylesheet" href="./style.css?v=18">
 </head>
 <body>
   <main id="appMain" class="workspace">
@@ -172,6 +172,24 @@
             <div id="hybridApiStatus" class="hybrid-status"></div>
           </div>
 
+          <div id="instagramMethodGuide" class="method-guide hidden">
+            <div><span>⭐</span><b>프로페셔널 계정</b><small>게시물 링크로 API 자동 확인</small></div>
+            <div><span>📱</span><b>모바일 인스타 앱</b><small>댓글 캡처해서 확인</small></div>
+            <div><span>💻</span><b>PC · 모바일 웹</b><small>복사가 되면 댓글 붙여넣기</small></div>
+          </div>
+
+          <div id="pasteCommentBox" class="paste-comment-box hidden">
+            <div class="hybrid-label">PC · 복사 가능한 환경</div>
+            <strong>댓글 복사해서 붙여넣기</strong>
+            <p><b>모바일 인스타 앱에서는 댓글 전체 복사가 잘 안 될 수 있어요.</b><br>PC나 모바일 웹처럼 댓글 복사가 가능한 환경에서만 사용해주세요. 모바일 앱에서는 아래 <b>댓글 캡처</b> 방식이 가장 편해요.</p>
+            <textarea id="pastedComments" rows="8" placeholder="@user_aaa 댓글 내용&#10;@user.bbb 완료했어요&#10;@user_ccc 잘 보고 갑니다"></textarea>
+            <div class="paste-actions">
+              <button id="analyzePastedBtn" class="run-btn paste-run" type="button">붙여넣은 댓글 분석</button>
+              <button id="clearPastedBtn" class="secondary-btn" type="button">내용 지우기</button>
+            </div>
+            <div id="pasteAnalyzeStatus" class="hybrid-status"></div>
+          </div>
+
           <div id="captureFallbackTitle" class="fallback-title hidden">
             <span>또는</span><strong>댓글 캡처로 확인</strong>
           </div>
@@ -280,7 +298,7 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-  <script src="./config.js?v=16"></script>
-  <script src="./app.js?v=16"></script>
+  <script src="./config.js?v=18"></script>
+  <script src="./app.js?v=18"></script>
 </body>
 </html>
