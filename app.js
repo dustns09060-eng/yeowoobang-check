@@ -1,10 +1,12 @@
 (() => {
   const $ = id => document.getElementById(id);
+  const cfg = window.YEOWOOBANG_CONFIG || {};
 
   let mode = null;
   let currentMissing = [];
   let selectedFiles = [];
   let voteFiles = [];
+  let moneCommentFiles = [];
   let lastRecognized = [];
 
   // 여우방 운영진: Instagram 검사 시 자동 제외
@@ -47,6 +49,20 @@
         ownerPlaceholder:'@tlso_94',
         ownerHelp:'내 계정과 운영진은 좋아요 의무에서 자동 제외',
         ocrHint:'좋아요 목록의 아이디를 읽어 참여 명단과 비교합니다.'
+      };
+    }
+
+    if(mode === 'mone'){
+      return {
+        title:'모네방 확인',
+        eyebrow:'MONE ROOM CHECK',
+        placeholder:`벤 링크 대상자는 아래 참여 댓글 캡처에서 자동으로 만들어집니다.`,
+        listHelp:'벤 링크 대상자를 만든 뒤 좋아요 목록 캡처와 비교합니다.',
+        captureHelp:'벤 링크 대상자의 좋아요 여부를 확인할 좋아요 목록 캡처',
+        ownerLabel:'내 Instagram 아이디',
+        ownerPlaceholder:'@tlso_94',
+        ownerHelp:'내 계정과 운영진은 검사에서 자동 제외',
+        ocrHint:'좋아요 목록의 Instagram 아이디를 읽어 벤 링크 대상자와 비교합니다.'
       };
     }
 
@@ -94,6 +110,7 @@
     $('ownerHelp').textContent = c.ownerHelp;
     $('ocrHint').textContent = c.ocrHint;
     $('likeRosterBox').classList.toggle('hidden', mode !== 'like');
+    $('moneWorkflowBox').classList.toggle('hidden', mode !== 'mone');
 
     const resultHeading = document.querySelector('.missing-title h3');
     const resultLabel = document.querySelector('.result-header h2');
@@ -104,8 +121,8 @@
       resultLabel.textContent = mode === 'like' ? '좋아요 누락 결과' : '누락 결과';
     }
 
-    const key = mode === 'naver' ? 'yeowoobang_naver_owner' : (mode === 'like' ? 'yeowoobang_like_owner' : 'yeowoobang_instagram_owner');
-    $('ownerId').value = localStorage.getItem(key) || ((mode === 'instagram'||mode === 'like') ? 'tlso_94' : '');
+    const key = mode === 'naver' ? 'yeowoobang_naver_owner' : (mode === 'like' ? 'yeowoobang_like_owner' : (mode === 'mone' ? 'yeowoobang_mone_owner' : 'yeowoobang_instagram_owner'));
+    $('ownerId').value = localStorage.getItem(key) || ((mode === 'instagram'||mode === 'like'||mode === 'mone') ? 'tlso_94' : '');
 
     resetCheckOnly();
   }
@@ -225,7 +242,7 @@
     const numberMatch = original.match(/^\s*(\d+)/);
     const autoFreePass = /프패/.test(body);
 
-    if(mode === 'instagram' || mode === 'like'){
+    if(mode === 'instagram' || mode === 'like' || mode === 'mone'){
       let candidate = '';
       let nickname = '';
 
@@ -349,7 +366,7 @@
   }
 
   function parseIdList(text){
-    const normalizer = (mode === 'instagram' || mode === 'like') ? normalizeIg : normalizeBlog;
+    const normalizer = (mode === 'instagram' || mode === 'like' || mode === 'mone') ? normalizeIg : normalizeBlog;
     return new Set(
       String(text||'')
         .split(/[\n,]+/)
@@ -368,8 +385,8 @@
 
     $('extractedList').innerHTML = p.items.length
       ? p.items.map(x=>{
-          const isAdmin = (mode==='instagram'||mode==='like') && INSTAGRAM_ADMIN_IDS.includes(normalizeIg(x.target));
-          return `<span>${(mode==='instagram'||mode==='like')?'@':''}${esc(x.target)}${x.requiredCount>1?`<em class="count-badge">${x.requiredCount}회</em>`:''}${isAdmin?'<em class="admin-badge">운영진</em>':''}${x.autoFreePass?'<em>프패</em>':''}</span>`;
+          const isAdmin = (mode==='instagram'||mode==='like'||mode==='mone') && INSTAGRAM_ADMIN_IDS.includes(normalizeIg(x.target));
+          return `<span>${(mode==='instagram'||mode==='like'||mode==='mone')?'@':''}${esc(x.target)}${x.requiredCount>1?`<em class="count-badge">${x.requiredCount}회</em>`:''}${isAdmin?'<em class="admin-badge">운영진</em>':''}${x.autoFreePass?'<em>프패</em>':''}</span>`;
         }).join('')
       : '<small>추출된 대상이 없습니다.</small>';
 
@@ -385,14 +402,14 @@
     const parsed = parseParticipants($('participants').value);
     if(!parsed.items.length) throw new Error('참여자 명단을 먼저 입력해주세요.');
 
-    const normalizer = (mode === 'instagram' || mode === 'like') ? normalizeIg : normalizeBlog;
+    const normalizer = (mode === 'instagram' || mode === 'like' || mode === 'mone') ? normalizeIg : normalizeBlog;
     const recognizedCounts = new Map();
     recognizedNames.map(normalizer).filter(Boolean).forEach(id=>{
       recognizedCounts.set(id,(recognizedCounts.get(id)||0)+1);
     });
 
     const excluded = parseIdList($('excludeIds').value);
-    if(mode === 'instagram' || mode === 'like'){
+    if(mode === 'instagram' || mode === 'like' || mode === 'mone'){
       INSTAGRAM_ADMIN_IDS.forEach(id => excluded.add(normalizeIg(id)));
     }
     const owner = normalizer($('ownerId').value);
@@ -409,7 +426,7 @@
     const completed = [];
     const missing = [];
     checkTargets.forEach(x=>{
-      const required = mode === 'like' ? 1 : (x.requiredCount || 1);
+      const required = (mode === 'like' || mode === 'mone') ? 1 : (x.requiredCount || 1);
       const found = recognizedCounts.get(x.norm) || 0;
       const shortage = Math.max(0,required-found);
       const row={...x,requiredCount:required,foundCount:found,shortage};
@@ -433,7 +450,7 @@
           <div class="missing-item">
             <div>
               <small>${x.no?x.no+'. ':''}${esc(x.nickname||'')}</small>
-              <strong>${(mode==='instagram'||mode==='like')?'@':''}${esc(x.target)}</strong>
+              <strong>${(mode==='instagram'||mode==='like'||mode==='mone')?'@':''}${esc(x.target)}</strong>
               <small class="count-detail">필요 ${x.requiredCount}회 · 확인 ${x.foundCount}회 · ${x.shortage}회 부족</small>
             </div>
             <span>${x.shortage}회 부족</span>
@@ -513,30 +530,45 @@
     return out;
   }
 
+  function normalizeKoreanOcr(v){
+    return String(v||'').toLowerCase().replace(/\s+/g,'').replace(/[^\p{L}\p{N}._-]/gu,'');
+  }
+
   function recognizeNaver(text,items){
-    // Korean OCR is enabled in Naver mode.
-    const raw = String(text||'').toLowerCase();
-    const compact = normalizeBlog(raw);
-    const matched = new Set();
+    const raw=String(text||'');
+    const lines=raw.split(/\r?\n/).map(normalizeKoreanOcr).filter(Boolean);
+    const joined=lines.join('');
+    const matched=new Set();
 
     items.forEach(p=>{
-      if(!p.norm) return;
+      const target=normalizeKoreanOcr(p.target);
+      if(!target) return;
+      if(joined.includes(target)){ matched.add(p.norm); return; }
 
-      // exact normalized visible nickname
-      if(compact.includes(p.norm)){
-        matched.add(p.norm);
-        return;
+      if(target.length>=3){
+        let best=99;
+        for(const line of lines){
+          if(line.length>=target.length){
+            for(let i=0;i<=line.length-target.length;i++){
+              best=Math.min(best,levenshtein(target,line.slice(i,i+target.length)));
+              if(best<=1) break;
+            }
+          }else best=Math.min(best,levenshtein(target,line));
+          if(best<=1) break;
+        }
+        const threshold=target.length>=6?2:1;
+        if(best<=threshold){ matched.add(p.norm); return; }
       }
 
-      const targetSkeleton = p.skeleton;
-      if(targetSkeleton.length >= 2){
-        const ocrSkeleton = compact.replace(/[^\p{L}\p{N}]/gu,'');
-        if(ocrSkeleton.includes(targetSkeleton)){
-          matched.add(p.norm);
-        }
+      if(target.length>=2){
+        const hit=lines.some(line=>{
+          let pos=0;
+          for(const ch of [...target]){ pos=line.indexOf(ch,pos); if(pos<0) return false; pos++; }
+          return true;
+        });
+        if(hit) matched.add(p.norm);
       }
     });
-
     return matched;
   }
 
@@ -594,7 +626,7 @@
       const lang = mode === 'naver' ? 'kor+eng' : 'eng';
       worker = await Tesseract.createWorker(lang);
 
-      if(mode === 'instagram' || mode === 'like'){
+      if(mode === 'instagram' || mode === 'like' || mode === 'mone'){
         try{
           await worker.setParameters({
             preserve_interword_spaces: '1',
@@ -634,7 +666,7 @@
       $('ocrResultFold').classList.remove('hidden');
       setProgress(`완료 · ${lastRecognized.length}명 인식`,100);
 
-      runComparison(lastRecognized,`${mode==='naver'?'네이버 블로그 댓글':(mode==='like'?'인스타 좋아요':'인스타 댓글')} 캡처 ${selectedFiles.length}장 분석`);
+      runComparison(lastRecognized,`${mode==='naver'?'네이버 블로그 댓글':(mode==='like'?'인스타 좋아요':(mode==='mone'?'모네방 좋아요':'인스타 댓글'))} 캡처 ${selectedFiles.length}장 분석`);
     }finally{
       if(worker){
         try{await worker.terminate();}catch(_){}
@@ -645,7 +677,7 @@
   }
 
   function rerunFromOcr(){
-    const normalizer = (mode === 'instagram' || mode === 'like') ? normalizeIg : normalizeBlog;
+    const normalizer = (mode === 'instagram' || mode === 'like' || mode === 'mone') ? normalizeIg : normalizeBlog;
 
     const values = String($('ocrUsernames').value||'')
       .split(/\r?\n/)
@@ -695,10 +727,57 @@
     renderFileList();
 
     if(mode){
-      const key = mode === 'naver' ? 'yeowoobang_naver_owner' : (mode === 'like' ? 'yeowoobang_like_owner' : 'yeowoobang_instagram_owner');
-      $('ownerId').value = localStorage.getItem(key) || ((mode==='instagram'||mode==='like')?'tlso_94':'');
+      const key = mode === 'naver' ? 'yeowoobang_naver_owner' : (mode === 'like' ? 'yeowoobang_like_owner' : (mode === 'mone' ? 'yeowoobang_mone_owner' : 'yeowoobang_instagram_owner'));
+      $('ownerId').value = localStorage.getItem(key) || ((mode==='instagram'||mode==='like'||mode==='mone')?'tlso_94':'');
     }
   }
+
+  async function verifyPassword(){
+    const password=$('accessPassword').value;
+    const msg=$('loginMessage');
+    if(!password){msg.textContent='비밀번호를 입력해주세요.';return;}
+    if(!cfg.API_URL){msg.textContent='서버 주소가 설정되지 않았습니다.';return;}
+    $('loginBtn').disabled=true;$('loginBtn').textContent='확인 중...';
+    try{
+      const url=new URL(cfg.API_URL);url.searchParams.set('action','verify_password');url.searchParams.set('password',password);url.searchParams.set('_',Date.now());
+      const res=await fetch(url.toString(),{method:'GET',redirect:'follow'});const data=await res.json();
+      if(data.ok&&data.authorized){sessionStorage.setItem('yeowoobang_authorized','1');$('loginGate').classList.add('hidden');$('appMain').classList.remove('hidden');msg.textContent='';}
+      else msg.textContent='비밀번호가 맞지 않습니다.';
+    }catch(e){msg.textContent='접속 확인에 실패했습니다.';}
+    finally{$('loginBtn').disabled=false;$('loginBtn').textContent='접속하기';}
+  }
+
+  function renderMoneCommentFiles(){
+    const box=$('moneCommentFileList');
+    if(!moneCommentFiles.length){box.className='thumb-list empty';box.textContent='선택된 댓글 캡처가 없습니다.';return;}
+    box.className='thumb-list';box.innerHTML=moneCommentFiles.map((f,i)=>`<div class="file-chip"><span>${i+1}. ${esc(f.name)}</span></div>`).join('');
+  }
+
+  async function extractMoneTargets(){
+    const mapping=parseMemberMapping($('moneMemberMapping').value);
+    if(!mapping.size){alert('여우방 등록 명단을 먼저 붙여넣어주세요.');return;}
+    if(!moneCommentFiles.length){alert('참여 댓글 캡처를 먼저 추가해주세요.');return;}
+    const status=$('moneExtractStatus');status.className='notice';status.textContent='참여 댓글에서 벤 링크 대상자를 찾는 중이에요…';
+    const found=[];
+    for(let i=0;i<moneCommentFiles.length;i++){
+      status.textContent=`댓글 캡처 분석 중 · ${i+1}/${moneCommentFiles.length}`;
+      const r=await Tesseract.recognize(moneCommentFiles[i],'kor+eng');const text=r.data.text||'';const compact=normalizeNickname(text).replace(/\s/g,'');
+      for(const rec of mapping.values()){
+        const nick=normalizeNickname(rec.nickname).replace(/\s/g,'');
+        if(nick&&compact.includes(nick)) found.push(rec);
+      }
+    }
+    const unique=[...new Map(found.map(x=>[normalizeIg(x.id),x])).values()];
+    $('participants').value=unique.map((x,i)=>`${i+1}. ${x.nickname} / ${x.id}`).join('\n');renderParsed();
+    status.className='notice';status.innerHTML=`<strong>${unique.length}명 벤 링크 검사 대상 생성</strong><br>좋아요 목록 캡처를 추가한 뒤 분석을 시작해주세요.`;
+  }
+
+  if(sessionStorage.getItem('yeowoobang_authorized')==='1'){$('loginGate').classList.add('hidden');$('appMain').classList.remove('hidden');}
+  $('loginBtn').addEventListener('click',verifyPassword);$('accessPassword').addEventListener('keydown',e=>{if(e.key==='Enter')verifyPassword();});
+  $('moneCommentImages').addEventListener('change',e=>{moneCommentFiles=Array.from(e.target.files||[]);renderMoneCommentFiles();});
+  $('moneExtractBtn').addEventListener('click',extractMoneTargets);
+  $('moneMemberMapping').value=localStorage.getItem('yeowoobang_mone_mapping')||'';
+  $('moneMemberMapping').addEventListener('input',()=>localStorage.setItem('yeowoobang_mone_mapping',$('moneMemberMapping').value));
 
   document.querySelectorAll('.channel-card').forEach(btn=>{
     btn.addEventListener('click',()=>selectMode(btn.dataset.mode));
@@ -754,7 +833,7 @@
 
   $('ownerId').addEventListener('input',()=>{
     if(!mode) return;
-    const key = mode === 'naver' ? 'yeowoobang_naver_owner' : (mode === 'like' ? 'yeowoobang_like_owner' : 'yeowoobang_instagram_owner');
+    const key = mode === 'naver' ? 'yeowoobang_naver_owner' : (mode === 'like' ? 'yeowoobang_like_owner' : (mode === 'mone' ? 'yeowoobang_mone_owner' : 'yeowoobang_instagram_owner'));
     localStorage.setItem(key,$('ownerId').value.trim());
   });
 

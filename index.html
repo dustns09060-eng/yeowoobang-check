@@ -5,10 +5,22 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f4efe8">
   <title>YEOWOOBANG CHECK · 품앗이 누락 확인</title>
-  <link rel="stylesheet" href="./style.css?v=14">
+  <link rel="stylesheet" href="./style.css?v=15">
 </head>
 <body>
-  <main class="workspace">
+  <section id="loginGate" class="login-gate">
+    <div class="login-card">
+      <div class="login-logo">🦊</div>
+      <div class="eyebrow">YEOWOOBANG PRIVATE TOOL</div>
+      <h1>여우방 전용 프로그램</h1>
+      <p>접속 비밀번호를 입력해주세요.</p>
+      <input id="accessPassword" type="password" autocomplete="current-password" placeholder="비밀번호">
+      <button id="loginBtn" class="run-btn">접속하기</button>
+      <div id="loginMessage" class="login-message"></div>
+    </div>
+  </section>
+
+  <main id="appMain" class="workspace hidden">
 
     <header class="hero">
       <div class="hero-mark">🦊</div>
@@ -43,6 +55,16 @@
             <span>INSTAGRAM LIKE</span>
             <h2>인스타 좋아요 확인</h2>
             <p>좋아요 목록 캡처를 올리면 참여자와 자동 비교</p>
+          </div>
+          <div class="channel-arrow">→</div>
+        </button>
+
+        <button class="channel-card mone" data-mode="mone">
+          <div class="channel-icon">M</div>
+          <div class="channel-copy">
+            <span>MONE ROOM</span>
+            <h2>모네방 확인</h2>
+            <p>벤 링크 대상자만 추출해서 좋아요 누락을 확인</p>
           </div>
           <div class="channel-arrow">→</div>
         </button>
@@ -109,6 +131,24 @@
             </label>
             <button id="voteExtractBtn" class="run-btn secondary-run" type="button">투표 참여자 자동 만들기</button>
             <div id="voteExtractStatus" class="notice hidden"></div>
+          </div>
+
+          <div id="moneWorkflowBox" class="mone-workflow hidden">
+            <strong>모네방 벤 링크 대상 검사</strong>
+            <p>참여 댓글 캡처에서 <b>벤 링크를 남긴 사람만</b> 검사 대상으로 만들고, 그 대상자의 좋아요 여부만 확인합니다.</p>
+            <label class="dropzone mini-dropzone" for="moneCommentImages">
+              <span class="camera">＋</span>
+              <div><strong>참여 댓글 캡처 추가</strong><small>벤 링크 작성자의 닉네임/아이디가 보이게</small></div>
+            </label>
+            <input id="moneCommentImages" type="file" accept="image/*" multiple hidden>
+            <div id="moneCommentFileList" class="thumb-list empty">선택된 댓글 캡처가 없습니다.</div>
+            <label class="mapping-label">
+              <span>여우방 등록 명단</span>
+              <small>카톡/여우방 닉네임과 Instagram 아이디를 연결해주세요.</small>
+              <textarea id="moneMemberMapping" rows="6" placeholder="검이 / hagye_1234&#10;고담 / eunmin_1234"></textarea>
+            </label>
+            <button id="moneExtractBtn" class="run-btn secondary-run" type="button">벤 링크 대상자 만들기</button>
+            <div id="moneExtractStatus" class="notice hidden"></div>
           </div>
 
           <div class="helper-row">
@@ -239,6 +279,7 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-  <script src="./app.js?v=14"></script>
+  <script src="./config.js?v=15"></script>
+  <script src="./app.js?v=15"></script>
 </body>
 </html>
