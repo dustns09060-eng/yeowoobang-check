@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f4efe8">
   <title>YEOWOOBANG CHECK · 품앗이 누락 확인</title>
-  <link rel="stylesheet" href="./style.css?v=15">
+  <link rel="stylesheet" href="./style.css?v=100">
 </head>
 <body>
   <section id="loginGate" class="login-gate">
@@ -26,7 +26,7 @@
       <div class="hero-mark">🦊</div>
       <div class="hero-copy">
         <div class="eyebrow">YEOWOOBANG TOOL</div>
-        <h1>품앗이 누락 확인</h1>
+        <h1>품앗이 누락 확인 <small class="version-tag">v1.0 RC</small></h1>
         <p>인스타그램과 네이버 블로그를 한 곳에서 확인해요.</p>
       </div>
       <div class="hero-badge">BETA</div>
@@ -80,7 +80,7 @@
         </button>
       </div>
 
-      <div class="home-note">
+      <div class="home-note"><b>정식 배포 후보</b><span>OCR 인식 0명일 때 전원 누락 처리 금지 · 운영진/프패 자동 제외 · 비밀번호 접속</span></div><div class="home-note">
         <b>공통 기능</b>
         <span>댓글·좋아요·블로그 캡처 분석 · 프패/운영진 자동 제외</span>
       </div>
@@ -242,6 +242,11 @@
         <button id="rerunFromOcrBtn" class="secondary-btn">수정된 결과로 다시 비교</button>
       </section>
 
+      <div id="safetyNotice" class="safety-notice hidden">
+        <strong>자동 판정 보류</strong>
+        <span id="safetyNoticeText"></span>
+      </div>
+
       <section id="resultCard" class="result-board hidden">
         <div class="result-header">
           <div>
@@ -279,7 +284,7 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-  <script src="./config.js?v=15"></script>
-  <script src="./app.js?v=15"></script>
+  <script src="./config.js?v=100"></script>
+  <script src="./app.js?v=100"></script>
 </body>
 </html>

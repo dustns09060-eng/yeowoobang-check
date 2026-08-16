@@ -227,6 +227,11 @@
     }
 
     const unique=[...new Map(found.map(x=>[normalizeIg(x.id),x])).values()];
+    if(unique.length===0){
+      status.className='notice warning';
+      status.innerHTML='<strong>참여자를 인식하지 못했습니다.</strong><br>카톡 캡처와 등록 명단을 확인해주세요. 기존 참여 명단은 유지합니다.';
+      return;
+    }
     $('participants').value=unique.map((x,i)=>`${i+1}. ${x.nickname} / ${x.id}`).join('\n');
     updateParsedPreview();
 
@@ -398,7 +403,23 @@
     }
   }
 
+
+  function showSafetyStop(message){
+    $('resultCard')?.classList.add('hidden');
+    if($('safetyNotice')){
+      $('safetyNoticeText').textContent = message;
+      $('safetyNotice').classList.remove('hidden');
+      $('safetyNotice').scrollIntoView({behavior:'smooth',block:'center'});
+    }
+  }
+
+  function clearSafetyStop(){
+    $('safetyNotice')?.classList.add('hidden');
+    if($('safetyNoticeText')) $('safetyNoticeText').textContent='';
+  }
+
   function runComparison(recognizedNames, sourceLabel){
+    clearSafetyStop();
     const parsed = parseParticipants($('participants').value);
     if(!parsed.items.length) throw new Error('참여자 명단을 먼저 입력해주세요.');
 
@@ -655,6 +676,23 @@
 
       lastRecognized = [...allMatched].sort();
 
+      if(lastRecognized.length === 0 && parsed.items.length > 0){
+        $('captureMatchedCount').textContent = '0';
+        $('ocrResultCount').textContent = '0명';
+        $('ocrUsernames').value = '';
+        $('ocrResultFold').classList.remove('hidden');
+        setProgress('인식 실패 · 자동 판정 보류',100);
+
+        const label = mode === 'naver'
+          ? '네이버 블로그 닉네임을 한 명도 인식하지 못했습니다.'
+          : (mode === 'like' || mode === 'mone')
+            ? '좋아요 목록에서 Instagram 아이디를 한 명도 인식하지 못했습니다.'
+            : '댓글 화면에서 Instagram 아이디를 한 명도 인식하지 못했습니다.';
+
+        showSafetyStop(label + ' 전원을 누락자로 처리하지 않았습니다. 캡처를 더 선명하게 다시 올리거나 인식 결과를 직접 확인해주세요.');
+        return;
+      }
+
       $('captureMatchedCount').textContent = lastRecognized.length;
       $('ocrResultCount').textContent = lastRecognized.length+'명';
 
@@ -699,6 +737,8 @@
 
     if(!text) return alert('복사할 누락자가 없습니다.');
 
+    const ok = confirm(`${currentMissing.length}명의 누락자를 복사합니다.\nOCR 인식 결과를 한 번 확인하셨나요?`);
+    if(!ok) return;
     await navigator.clipboard.writeText(text);
     alert(`${currentMissing.length}명 복사했습니다.`);
   }
@@ -714,7 +754,7 @@
 
     if($('commentImages')) $('commentImages').value='';
 
-    ['ocrProgressWrap','ocrResultFold','resultCard','idDrawer','parseWarningsWrap'].forEach(id=>{
+    ['ocrProgressWrap','ocrResultFold','resultCard','idDrawer','parseWarningsWrap','safetyNotice'].forEach(id=>{
       $(id)?.classList.add('hidden');
     });
 
@@ -768,6 +808,11 @@
       }
     }
     const unique=[...new Map(found.map(x=>[normalizeIg(x.id),x])).values()];
+    if(unique.length===0){
+      status.className='notice warning';
+      status.innerHTML='<strong>참여자를 인식하지 못했습니다.</strong><br>카톡 캡처와 등록 명단을 확인해주세요. 기존 참여 명단은 유지합니다.';
+      return;
+    }
     $('participants').value=unique.map((x,i)=>`${i+1}. ${x.nickname} / ${x.id}`).join('\n');renderParsed();
     status.className='notice';status.innerHTML=`<strong>${unique.length}명 벤 링크 검사 대상 생성</strong><br>좋아요 목록 캡처를 추가한 뒤 분석을 시작해주세요.`;
   }
