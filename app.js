@@ -8,6 +8,8 @@
   let voteFiles = [];
   let moneCommentFiles = [];
   let lastRecognized = [];
+  let selectedCommentVideo = null;
+  let videoRecognized = [];
 
   // 여우방 운영진: Instagram 검사 시 자동 제외
   const INSTAGRAM_ADMIN_IDS = [
@@ -36,13 +38,15 @@
       return {
         title:'대량 댓글 수집 도우미',
         eyebrow:'LARGE ROOM COLLECTOR',
-        placeholder:'이 기능은 댓글 100개 이상 방을 위한 수집 도우미 확장용입니다.',
-        listHelp:'현재 웹 버전에서는 캡처 확인을 사용해주세요.',
-        captureHelp:'대량 댓글 수집 도우미는 별도 모바일 보조 기능으로 준비 중입니다.',
-        ownerLabel:'Instagram 아이디',
-        ownerPlaceholder:'@example',
-        ownerHelp:'현재는 안내 화면만 제공됩니다.',
-        ocrHint:'대량 댓글 수집 기능은 아직 활성화되지 않았습니다.'
+        placeholder:`1. 대박 / uju____like
+2. 유별 / tlso_94
+3. 토끼맘프패 / rabbit_mom`,
+        listHelp:'참여자 명단을 붙여넣고 댓글 화면 녹화 영상 1개로 작성자를 수집합니다.',
+        captureHelp:'화면 녹화 분석이 어려울 때만 기존 캡처 방식도 사용할 수 있어요.',
+        ownerLabel:'내 Instagram 아이디',
+        ownerPlaceholder:'@tlso_94',
+        ownerHelp:'내 계정과 운영진은 자동 제외',
+        ocrHint:'화면 녹화 영상을 일정 간격으로 분석해 참여 명단의 Instagram 아이디를 찾습니다.'
       };
     }
 
@@ -142,13 +146,7 @@
     $('likeRosterBox').classList.toggle('hidden', mode !== 'like');
     $('moneWorkflowBox').classList.toggle('hidden', mode !== 'mone');
     const isCollector = mode === 'collector';
-    document.querySelectorAll('.collector-only-note').forEach(el=>el.remove());
-    if(isCollector){
-      const panel=document.createElement('div');
-      panel.className='collector-only-note';
-      panel.innerHTML='<strong>대량 댓글 수집 도우미는 준비 중입니다.</strong><span>댓글 100개 이상 방에서 캡처 장수를 줄이기 위한 별도 수집 기능으로 연결할 예정이에요. 현재는 일반 댓글 캡처 확인을 이용해주세요.</span>';
-      document.querySelector('.channel-work')?.prepend(panel);
-    }
+    $('collectorVideoBox').classList.toggle('hidden', !isCollector);
 
     $('hybridApiBox').classList.toggle('hidden', mode !== 'instagram');
     $('instagramMethodGuide').classList.add('hidden');
@@ -367,6 +365,176 @@
       rows.push({at:new Date().toISOString(),type,detail:String(detail||'').slice(0,180)});
       localStorage.setItem('yeowoobang_local_events',JSON.stringify(rows.slice(-30)));
     }catch(e){}
+  }
+
+
+  function setVideoProgress(status,pct){
+    $('videoProgressWrap').classList.remove('hidden');
+    $('videoStatus').textContent=status;
+    $('videoPercent').textContent=Math.max(0,Math.min(100,Math.round(pct)))+'%';
+    $('videoBar').style.width=Math.max(0,Math.min(100,pct))+'%';
+  }
+
+  function waitForEvent(el,event){
+    return new Promise((resolve,reject)=>{
+      const onOk=()=>{ cleanup(); resolve(); };
+      const onErr=()=>{ cleanup(); reject(new Error('영상 파일을 읽지 못했습니다.')); };
+      const cleanup=()=>{
+        el.removeEventListener(event,onOk);
+        el.removeEventListener('error',onErr);
+      };
+      el.addEventListener(event,onOk,{once:true});
+      el.addEventListener('error',onErr,{once:true});
+    });
+  }
+
+  async function seekVideo(video,time){
+    if(Math.abs(video.currentTime-time)<0.04) return;
+    const p=waitForEvent(video,'seeked');
+    video.currentTime=Math.min(Math.max(0,time),Math.max(0,video.duration-0.05));
+    await p;
+  }
+
+  function drawVideoFrame(video){
+    const maxWidth=1500;
+    const scale=Math.min(1,maxWidth/video.videoWidth);
+    const canvas=document.createElement('canvas');
+    canvas.width=Math.max(1,Math.round(video.videoWidth*scale));
+    canvas.height=Math.max(1,Math.round(video.videoHeight*scale));
+    const ctx=canvas.getContext('2d',{willReadFrequently:true});
+    ctx.drawImage(video,0,0,canvas.width,canvas.height);
+
+    // 작은 사용자명 OCR을 위한 흑백/대비 보정
+    const img=ctx.getImageData(0,0,canvas.width,canvas.height);
+    const d=img.data;
+    for(let i=0;i<d.length;i+=4){
+      let gray=Math.round(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114);
+      gray=gray<150?Math.max(0,gray-25):Math.min(255,gray+15);
+      d[i]=d[i+1]=d[i+2]=gray;
+    }
+    ctx.putImageData(img,0,0);
+    return canvas;
+  }
+
+  async function analyzeCommentVideo(){
+    if(mode!=='collector') return;
+
+    const parsed=parseParticipants($('participants').value);
+    if(!parsed.items.length){
+      alert('참여자 명단을 먼저 입력해주세요.');
+      return;
+    }
+    if(!selectedCommentVideo){
+      alert('댓글 화면 녹화 영상을 먼저 선택해주세요.');
+      return;
+    }
+    if(!window.Tesseract){
+      alert('OCR 모듈을 불러오지 못했습니다.');
+      return;
+    }
+
+    const btn=$('videoAnalyzeBtn');
+    btn.disabled=true;
+    btn.textContent='영상 분석 중...';
+    $('videoRecognizedWrap').classList.add('hidden');
+
+    const video=document.createElement('video');
+    video.muted=true;
+    video.playsInline=true;
+    video.preload='metadata';
+    const url=URL.createObjectURL(selectedCommentVideo);
+    video.src=url;
+
+    let worker=null;
+
+    try{
+      setVideoProgress('영상 정보 읽는 중...',1);
+      await waitForEvent(video,'loadedmetadata');
+
+      if(!Number.isFinite(video.duration) || video.duration<=0){
+        throw new Error('영상 길이를 확인할 수 없습니다.');
+      }
+
+      const interval=Math.max(0.7,Number($('videoSampleInterval').value)||1.25);
+      let times=[];
+      for(let t=0.2;t<video.duration;t+=interval) times.push(t);
+
+      // 과도한 모바일 부하 방지: 최대 120프레임.
+      if(times.length>120){
+        const step=times.length/120;
+        times=Array.from({length:120},(_,i)=>times[Math.floor(i*step)]);
+        $('videoHint').textContent='영상이 길어서 최대 120개 화면으로 나누어 분석합니다.';
+      }else{
+        $('videoHint').textContent=`약 ${times.length}개 화면을 분석합니다. 분석 중에는 이 페이지를 닫지 마세요.`;
+      }
+
+      setVideoProgress('OCR 엔진 준비 중...',3);
+      worker=await Tesseract.createWorker('eng');
+      try{
+        await worker.setParameters({
+          preserve_interword_spaces:'1',
+          tessedit_pageseg_mode:'6'
+        });
+      }catch(_){}
+
+      const matchedSet=new Set();
+
+      for(let i=0;i<times.length;i++){
+        const pct=5+(i/times.length)*90;
+        setVideoProgress(`${i+1}/${times.length} 화면에서 아이디 찾는 중`,pct);
+
+        await seekVideo(video,times[i]);
+        const canvas=drawVideoFrame(video);
+        const result=await worker.recognize(canvas);
+        const text=result?.data?.text||'';
+
+        const matches=recognizeInstagram(text,parsed.items);
+        matches.forEach(id=>matchedSet.add(normalizeIg(id)));
+
+        // 이미 검사 대상 대부분을 찾았다면 조기 종료
+        const expected=parsed.items.filter(x=>!x.autoFreePass).length;
+        if(expected>0 && matchedSet.size>=expected) break;
+      }
+
+      videoRecognized=[...matchedSet].sort();
+      $('videoRecognizedCount').textContent=videoRecognized.length+'명';
+
+      const parsedMap=new Map(parsed.items.map(x=>[x.norm,x.target]));
+      $('videoRecognizedList').innerHTML=videoRecognized.length
+        ? videoRecognized.map(id=>`<span>@${esc(parsedMap.get(id)||id)}</span>`).join('')
+        : '<small>인식된 아이디가 없습니다.</small>';
+
+      $('videoRecognizedWrap').classList.remove('hidden');
+
+      if(videoRecognized.length===0){
+        setVideoProgress('아이디 인식 실패 · 자동 판정 보류',100);
+        $('videoHint').textContent='전원을 누락자로 처리하지 않았습니다. 스크롤 속도를 늦춰 다시 녹화하거나 캡처 방식으로 확인해주세요.';
+      }else{
+        setVideoProgress(`완료 · ${videoRecognized.length}명 인식`,100);
+        $('videoHint').textContent='인식된 아이디 목록을 확인한 뒤 누락자 비교를 눌러주세요.';
+      }
+
+      logLocalEvent('video_collector_done',`${videoRecognized.length} recognized`);
+    }catch(e){
+      setVideoProgress('영상 분석 실패',100);
+      $('videoHint').textContent=String(e.message||e);
+      logLocalEvent('video_collector_error',e.message||e);
+    }finally{
+      if(worker){
+        try{ await worker.terminate(); }catch(_){}
+      }
+      URL.revokeObjectURL(url);
+      btn.disabled=false;
+      btn.textContent='화면 녹화 분석 시작';
+    }
+  }
+
+  function compareVideoRecognized(){
+    if(!videoRecognized.length){
+      alert('영상에서 인식된 아이디가 없습니다. 자동 누락 판정은 하지 않습니다.');
+      return;
+    }
+    runComparison(videoRecognized,'대량 댓글 화면 녹화 분석');
   }
 
   function parseParticipantLine(line, lineNo){
@@ -744,10 +912,6 @@
   }
 
   async function runCaptureCheck(){
-    if(mode==='collector'){
-      alert('대량 댓글 수집 도우미는 아직 준비 중입니다. 현재는 댓글 캡처 확인 메뉴를 이용해주세요.');
-      return;
-    }
     const parsed = parseParticipants($('participants').value);
     if(!parsed.items.length) throw new Error('참여자 명단을 먼저 입력해주세요.');
     if(!selectedFiles.length) throw new Error('댓글 캡처를 한 장 이상 선택해주세요.');
@@ -844,6 +1008,8 @@
 
   function resetCheckOnly(){
     selectedFiles = [];
+    selectedCommentVideo=null;
+    videoRecognized=[];
     currentMissing = [];
     lastRecognized = [];
 
@@ -852,6 +1018,10 @@
     });
 
     if($('commentImages')) $('commentImages').value='';
+    if($('commentVideo')) $('commentVideo').value='';
+    if($('videoFileInfo')) { $('videoFileInfo').className='video-file-info empty'; $('videoFileInfo').textContent='선택된 영상이 없습니다.'; }
+    $('videoProgressWrap')?.classList.add('hidden');
+    $('videoRecognizedWrap')?.classList.add('hidden');
     if($('hybridPostUrl')) $('hybridPostUrl').value='';
     if($('hybridApiStatus')) { $('hybridApiStatus').textContent=''; $('hybridApiStatus').className='hybrid-status'; }
 
@@ -903,6 +1073,28 @@
   $('moneExtractBtn').addEventListener('click',extractMoneTargets);
   $('moneMemberMapping').value=localStorage.getItem('yeowoobang_mone_mapping')||'';
   $('moneMemberMapping').addEventListener('input',()=>localStorage.setItem('yeowoobang_mone_mapping',$('moneMemberMapping').value));
+
+
+  $('commentVideo').addEventListener('change',e=>{
+    selectedCommentVideo=(e.target.files&&e.target.files[0])||null;
+    videoRecognized=[];
+    $('videoRecognizedWrap').classList.add('hidden');
+    $('videoProgressWrap').classList.add('hidden');
+
+    const box=$('videoFileInfo');
+    if(!selectedCommentVideo){
+      box.className='video-file-info empty';
+      box.textContent='선택된 영상이 없습니다.';
+      return;
+    }
+
+    const mb=(selectedCommentVideo.size/1024/1024).toFixed(1);
+    box.className='video-file-info';
+    box.innerHTML=`<strong>${esc(selectedCommentVideo.name)}</strong><span>${mb}MB</span>`;
+  });
+
+  $('videoAnalyzeBtn').addEventListener('click',analyzeCommentVideo);
+  $('videoCompareBtn').addEventListener('click',compareVideoRecognized);
 
   document.querySelectorAll('.channel-card').forEach(btn=>{
     btn.addEventListener('click',()=>selectMode(btn.dataset.mode));

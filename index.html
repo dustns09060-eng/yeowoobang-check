@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f4efe8">
   <title>YEOWOOBANG CHECK · 품앗이 누락 확인</title>
-  <link rel="stylesheet" href="./style.css?v=22">
+  <link rel="stylesheet" href="./style.css?v=23">
 </head>
 <body>
   <main id="appMain" class="workspace">
@@ -24,7 +24,7 @@
       <div class="service-base-banner">
         <div>
           <strong>2,000명+ 사용 대비 베이스</strong>
-          <span>회원은 캡처 확인 · 관리자는 API 자동 확인 · 대량 댓글은 수집 도우미 확장 예정</span>
+          <span>회원은 캡처 확인 · 관리자는 API 자동 확인 · 대량 댓글은 화면 녹화 수집</span>
         </div>
         <span class="service-chip">SERVICE BASE</span>
       </div><div class="test-mode-banner"><strong>하이브리드 테스트 버전</strong><span>인스타 댓글은 API 자동 확인 → 안 되면 캡처 확인으로 전환됩니다.</span></div>
@@ -59,7 +59,7 @@
           <div class="channel-copy">
             <span>LARGE ROOM</span>
             <h2>대량 댓글 수집 도우미</h2>
-            <p>댓글 100개 이상 방을 위한 수집 기능 · 현재 준비 중</p>
+            <p>댓글을 화면 녹화한 뒤 영상 1개로 작성자 아이디 수집</p>
           </div>
           <div class="channel-arrow">→</div>
         </button>
@@ -164,6 +164,59 @@
             </label>
             <button id="moneExtractBtn" class="run-btn secondary-run" type="button">벤 링크 대상자 만들기</button>
             <div id="moneExtractStatus" class="notice hidden"></div>
+          </div>
+
+          <div id="collectorVideoBox" class="collector-video-box hidden">
+            <div class="collector-title">
+              <span class="collector-badge">대량 댓글</span>
+              <strong>댓글 화면 녹화로 한 번에 확인</strong>
+            </div>
+            <p>
+              인스타 댓글을 <b>끝까지 펼친 뒤 천천히 아래로 스크롤하면서 화면 녹화</b>해주세요.
+              영상 파일 1개를 올리면 일정 간격으로 화면을 읽어서 참여 명단의 아이디를 찾아요.
+            </p>
+
+            <label class="dropzone collector-dropzone" for="commentVideo">
+              <span class="camera">▶</span>
+              <div>
+                <strong>댓글 화면 녹화 영상 선택</strong>
+                <small>MP4 · WEBM 등 / 영상은 서버로 전송하지 않고 현재 기기에서 분석</small>
+              </div>
+            </label>
+            <input id="commentVideo" type="file" accept="video/*" hidden>
+
+            <div id="videoFileInfo" class="video-file-info empty">선택된 영상이 없습니다.</div>
+
+            <div class="collector-options">
+              <label>
+                <span>분석 정밀도</span>
+                <select id="videoSampleInterval">
+                  <option value="2">빠르게 · 2초 간격</option>
+                  <option value="1.25" selected>권장 · 1.25초 간격</option>
+                  <option value="0.8">정밀 · 0.8초 간격</option>
+                </select>
+              </label>
+            </div>
+
+            <div id="videoProgressWrap" class="ocr-box hidden">
+              <div class="ocr-line">
+                <strong id="videoStatus">영상 준비 중</strong>
+                <span id="videoPercent">0%</span>
+              </div>
+              <div class="meter"><i id="videoBar"></i></div>
+              <small id="videoHint">스크롤을 너무 빠르게 하면 아이디를 놓칠 수 있어요.</small>
+            </div>
+
+            <button id="videoAnalyzeBtn" class="run-btn collector-run" type="button">화면 녹화 분석 시작</button>
+
+            <div id="videoRecognizedWrap" class="collector-recognized hidden">
+              <div class="collector-recognized-head">
+                <strong>영상에서 찾은 댓글 작성자</strong>
+                <span id="videoRecognizedCount">0명</span>
+              </div>
+              <div id="videoRecognizedList" class="id-cloud"></div>
+              <button id="videoCompareBtn" class="secondary-btn" type="button">이 결과로 누락자 비교</button>
+            </div>
           </div>
 
           <div class="helper-row">
@@ -318,7 +371,7 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-  <script src="./config.js?v=22"></script>
-  <script src="./app.js?v=22"></script>
+  <script src="./config.js?v=23"></script>
+  <script src="./app.js?v=23"></script>
 </body>
 </html>
