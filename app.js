@@ -4,6 +4,7 @@
   let mode = null;
   let currentMissing = [];
   let selectedFiles = [];
+  let voteFiles = [];
   let lastRecognized = [];
 
   // 여우방 운영진: Instagram 검사 시 자동 제외
@@ -29,6 +30,26 @@
   const isIg = s => /^[a-z0-9._]{1,30}$/i.test(s||'');
 
   function configForMode(){
+    if(mode === 'like'){
+      return {
+        title:'인스타 좋아요 확인',
+        eyebrow:'INSTAGRAM LIKE CHECK',
+        placeholder:`1. 대박 / uju____like
+2. 유별 / tlso_94
+3. 토끼맘프패 / rabbit_mom
+
+또는
+@fox_mom
+@rabbit_mom`,
+        listHelp:'직접 명단을 붙여넣거나, 아래 카톡 투표 캡처에서 참여자를 자동으로 만들 수 있어요.',
+        captureHelp:'게시물의 좋아요 목록을 열고 아이디가 보이게 여러 장 캡처',
+        ownerLabel:'내 Instagram 아이디',
+        ownerPlaceholder:'@tlso_94',
+        ownerHelp:'내 계정과 운영진은 좋아요 의무에서 자동 제외',
+        ocrHint:'좋아요 목록의 아이디를 읽어 참여 명단과 비교합니다.'
+      };
+    }
+
     if(mode === 'naver'){
       return {
         title:'블로그 댓글 확인',
@@ -72,9 +93,19 @@
     $('ownerId').placeholder = c.ownerPlaceholder;
     $('ownerHelp').textContent = c.ownerHelp;
     $('ocrHint').textContent = c.ocrHint;
+    $('likeRosterBox').classList.toggle('hidden', mode !== 'like');
 
-    const key = mode === 'naver' ? 'yeowoobang_naver_owner' : 'yeowoobang_instagram_owner';
-    $('ownerId').value = localStorage.getItem(key) || (mode === 'instagram' ? 'tlso_94' : '');
+    const resultHeading = document.querySelector('.missing-title h3');
+    const resultLabel = document.querySelector('.result-header h2');
+    if(resultHeading){
+      resultHeading.textContent = mode === 'like' ? '좋아요 누락자' : '누락자';
+    }
+    if(resultLabel){
+      resultLabel.textContent = mode === 'like' ? '좋아요 누락 결과' : '누락 결과';
+    }
+
+    const key = mode === 'naver' ? 'yeowoobang_naver_owner' : (mode === 'like' ? 'yeowoobang_like_owner' : 'yeowoobang_instagram_owner');
+    $('ownerId').value = localStorage.getItem(key) || ((mode === 'instagram'||mode === 'like') ? 'tlso_94' : '');
 
     resetCheckOnly();
   }
@@ -86,6 +117,106 @@
     $('homeScreen').classList.remove('hidden');
   }
 
+
+  function normalizeNickname(s){
+    return String(s||'')
+      .replace(/\([^)]*\)/g,' ')
+      .replace(/[@#]/g,' ')
+      .replace(/[·•|]/g,' ')
+      .replace(/\s+/g,' ')
+      .trim()
+      .toLowerCase();
+  }
+
+  function parseMemberMapping(text){
+    const map = new Map();
+    String(text||'').split(/\r?\n/).forEach(line=>{
+      let s=line.trim();
+      if(!s) return;
+      s=s.replace(/^\s*\d+\s*[.)]?\s*/,'').trim();
+      let nick='', id='';
+      if(s.includes('/')){
+        const k=s.indexOf('/');
+        nick=s.slice(0,k).trim();
+        const m=s.slice(k+1).match(/@?([A-Za-z0-9._]{1,30})/);
+        if(m) id=m[1];
+      }else{
+        const at=s.match(/@([A-Za-z0-9._]{1,30})/);
+        if(at){ id=at[1]; nick=s.slice(0,at.index).trim(); }
+        else{
+          const parts=s.split(/\s+/);
+          const last=parts[parts.length-1]?.replace(/^@/,'');
+          if(isIg(last)){ id=last; nick=parts.slice(0,-1).join(' '); }
+        }
+      }
+      if(nick && isIg(id)) map.set(normalizeNickname(nick), {nickname:nick,id});
+    });
+    return map;
+  }
+
+  function renderVoteFiles(){
+    const box=$('voteFileList');
+    if(!voteFiles.length){ box.className='thumb-list empty'; box.textContent='선택된 투표 캡처가 없습니다.'; return; }
+    box.className='thumb-list';
+    box.innerHTML=voteFiles.map((f,i)=>`<div class="file-chip"><span>${i+1}. ${esc(f.name)}</span></div>`).join('');
+  }
+
+  async function extractVoteParticipants(){
+    if(mode!=='like') return;
+    const mapping=parseMemberMapping($('memberMapping').value);
+    if(!mapping.size){ alert('여우방 등록 명단을 먼저 붙여넣어주세요.'); return; }
+    if(!voteFiles.length){ alert('카톡 투표 현황 캡처를 먼저 추가해주세요.'); return; }
+
+    const status=$('voteExtractStatus');
+    status.className='notice';
+    status.innerHTML='카톡 투표 캡처에서 닉네임을 읽는 중이에요…';
+
+    const allText=[];
+    for(let i=0;i<voteFiles.length;i++){
+      status.innerHTML=`투표 캡처 분석 중 · ${i+1}/${voteFiles.length}`;
+      const r=await Tesseract.recognize(voteFiles[i],'kor+eng',{
+        logger:m=>{},
+        tessedit_pageseg_mode:'6'
+      });
+      allText.push(r.data.text||'');
+    }
+
+    const blob=allText.join('\n');
+    const found=[], missing=[];
+    for(const [key, rec] of mapping.entries()){
+      const nick=rec.nickname;
+      const compactNick=normalizeNickname(nick).replace(/\s/g,'');
+      const compactBlob=normalizeNickname(blob).replace(/\s/g,'');
+      if(compactNick && compactBlob.includes(compactNick)){
+        found.push(rec);
+      }
+    }
+
+    // OCR may split Korean names. Check line fragments with loose character containment.
+    if(found.length < mapping.size){
+      const foundIds=new Set(found.map(x=>normalizeIg(x.id)));
+      const lines=blob.split(/\r?\n/).map(normalizeNickname).filter(Boolean);
+      for(const rec of mapping.values()){
+        if(foundIds.has(normalizeIg(rec.id))) continue;
+        const chars=[...normalizeNickname(rec.nickname).replace(/\s/g,'')];
+        const hit=lines.some(line=>{
+          let pos=0;
+          const c=line.replace(/\s/g,'');
+          for(const ch of chars){ pos=c.indexOf(ch,pos); if(pos<0) return false; pos++; }
+          return chars.length>=2;
+        });
+        if(hit){ found.push(rec); foundIds.add(normalizeIg(rec.id)); }
+      }
+    }
+
+    const unique=[...new Map(found.map(x=>[normalizeIg(x.id),x])).values()];
+    $('participants').value=unique.map((x,i)=>`${i+1}. ${x.nickname} / ${x.id}`).join('\n');
+    updateParsedPreview();
+
+    status.className='notice';
+    status.innerHTML=`<strong>${unique.length}명 참여자 생성 완료</strong><br>카톡에서 잘린 아이디 대신 등록 명단의 전체 Instagram 아이디로 변환했어요.`;
+  }
+
   function parseParticipantLine(line, lineNo){
     const original = String(line||'').trim();
     if(!original) return null;
@@ -94,7 +225,7 @@
     const numberMatch = original.match(/^\s*(\d+)/);
     const autoFreePass = /프패/.test(body);
 
-    if(mode === 'instagram'){
+    if(mode === 'instagram' || mode === 'like'){
       let candidate = '';
       let nickname = '';
 
@@ -218,7 +349,7 @@
   }
 
   function parseIdList(text){
-    const normalizer = mode === 'instagram' ? normalizeIg : normalizeBlog;
+    const normalizer = (mode === 'instagram' || mode === 'like') ? normalizeIg : normalizeBlog;
     return new Set(
       String(text||'')
         .split(/[\n,]+/)
@@ -237,8 +368,8 @@
 
     $('extractedList').innerHTML = p.items.length
       ? p.items.map(x=>{
-          const isAdmin = mode==='instagram' && INSTAGRAM_ADMIN_IDS.includes(normalizeIg(x.target));
-          return `<span>${mode==='instagram'?'@':''}${esc(x.target)}${x.requiredCount>1?`<em class="count-badge">${x.requiredCount}회</em>`:''}${isAdmin?'<em class="admin-badge">운영진</em>':''}${x.autoFreePass?'<em>프패</em>':''}</span>`;
+          const isAdmin = (mode==='instagram'||mode==='like') && INSTAGRAM_ADMIN_IDS.includes(normalizeIg(x.target));
+          return `<span>${(mode==='instagram'||mode==='like')?'@':''}${esc(x.target)}${x.requiredCount>1?`<em class="count-badge">${x.requiredCount}회</em>`:''}${isAdmin?'<em class="admin-badge">운영진</em>':''}${x.autoFreePass?'<em>프패</em>':''}</span>`;
         }).join('')
       : '<small>추출된 대상이 없습니다.</small>';
 
@@ -254,14 +385,14 @@
     const parsed = parseParticipants($('participants').value);
     if(!parsed.items.length) throw new Error('참여자 명단을 먼저 입력해주세요.');
 
-    const normalizer = mode === 'instagram' ? normalizeIg : normalizeBlog;
+    const normalizer = (mode === 'instagram' || mode === 'like') ? normalizeIg : normalizeBlog;
     const recognizedCounts = new Map();
     recognizedNames.map(normalizer).filter(Boolean).forEach(id=>{
       recognizedCounts.set(id,(recognizedCounts.get(id)||0)+1);
     });
 
     const excluded = parseIdList($('excludeIds').value);
-    if(mode === 'instagram'){
+    if(mode === 'instagram' || mode === 'like'){
       INSTAGRAM_ADMIN_IDS.forEach(id => excluded.add(normalizeIg(id)));
     }
     const owner = normalizer($('ownerId').value);
@@ -278,7 +409,7 @@
     const completed = [];
     const missing = [];
     checkTargets.forEach(x=>{
-      const required = x.requiredCount || 1;
+      const required = mode === 'like' ? 1 : (x.requiredCount || 1);
       const found = recognizedCounts.get(x.norm) || 0;
       const shortage = Math.max(0,required-found);
       const row={...x,requiredCount:required,foundCount:found,shortage};
@@ -297,12 +428,12 @@
     $('checkedPost').textContent = sourceLabel||'';
 
     $('missingList').innerHTML = !missing.length
-      ? '<div class="all-clear">누락자가 없습니다 ✓</div>'
+      ? mode === 'like' ? '<div class="all-clear">좋아요 누락자가 없습니다 ✓</div>' : '<div class="all-clear">누락자가 없습니다 ✓</div>'
       : missing.map(x=>`
           <div class="missing-item">
             <div>
               <small>${x.no?x.no+'. ':''}${esc(x.nickname||'')}</small>
-              <strong>${mode==='instagram'?'@':''}${esc(x.target)}</strong>
+              <strong>${(mode==='instagram'||mode==='like')?'@':''}${esc(x.target)}</strong>
               <small class="count-detail">필요 ${x.requiredCount}회 · 확인 ${x.foundCount}회 · ${x.shortage}회 부족</small>
             </div>
             <span>${x.shortage}회 부족</span>
@@ -463,7 +594,7 @@
       const lang = mode === 'naver' ? 'kor+eng' : 'eng';
       worker = await Tesseract.createWorker(lang);
 
-      if(mode === 'instagram'){
+      if(mode === 'instagram' || mode === 'like'){
         try{
           await worker.setParameters({
             preserve_interword_spaces: '1',
@@ -503,7 +634,7 @@
       $('ocrResultFold').classList.remove('hidden');
       setProgress(`완료 · ${lastRecognized.length}명 인식`,100);
 
-      runComparison(lastRecognized,`${mode==='instagram'?'인스타':'네이버 블로그'} 댓글 캡처 ${selectedFiles.length}장 분석`);
+      runComparison(lastRecognized,`${mode==='naver'?'네이버 블로그 댓글':(mode==='like'?'인스타 좋아요':'인스타 댓글')} 캡처 ${selectedFiles.length}장 분석`);
     }finally{
       if(worker){
         try{await worker.terminate();}catch(_){}
@@ -514,7 +645,7 @@
   }
 
   function rerunFromOcr(){
-    const normalizer = mode === 'instagram' ? normalizeIg : normalizeBlog;
+    const normalizer = (mode === 'instagram' || mode === 'like') ? normalizeIg : normalizeBlog;
 
     const values = String($('ocrUsernames').value||'')
       .split(/\r?\n/)
@@ -564,8 +695,8 @@
     renderFileList();
 
     if(mode){
-      const key = mode === 'naver' ? 'yeowoobang_naver_owner' : 'yeowoobang_instagram_owner';
-      $('ownerId').value = localStorage.getItem(key) || (mode==='instagram'?'tlso_94':'');
+      const key = mode === 'naver' ? 'yeowoobang_naver_owner' : (mode === 'like' ? 'yeowoobang_like_owner' : 'yeowoobang_instagram_owner');
+      $('ownerId').value = localStorage.getItem(key) || ((mode==='instagram'||mode==='like')?'tlso_94':'');
     }
   }
 
@@ -575,6 +706,17 @@
 
   $('backHomeBtn').addEventListener('click',goHome);
   $('participants').addEventListener('input',renderParsed);
+
+
+  $('voteImages').addEventListener('change',e=>{
+    voteFiles=Array.from(e.target.files||[]);
+    renderVoteFiles();
+  });
+  $('voteExtractBtn').addEventListener('click',extractVoteParticipants);
+  $('memberMapping').addEventListener('input',()=>{
+    try{ localStorage.setItem('yeowoobang_member_mapping',$('memberMapping').value); }catch(e){}
+  });
+  $('memberMapping').value=localStorage.getItem('yeowoobang_member_mapping')||'';
 
   $('commentImages').addEventListener('change',e=>{
     selectedFiles = Array.from(e.target.files||[]);
@@ -612,7 +754,7 @@
 
   $('ownerId').addEventListener('input',()=>{
     if(!mode) return;
-    const key = mode === 'naver' ? 'yeowoobang_naver_owner' : 'yeowoobang_instagram_owner';
+    const key = mode === 'naver' ? 'yeowoobang_naver_owner' : (mode === 'like' ? 'yeowoobang_like_owner' : 'yeowoobang_instagram_owner');
     localStorage.setItem(key,$('ownerId').value.trim());
   });
 

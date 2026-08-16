@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f4efe8">
   <title>YEOWOOBANG CHECK · 품앗이 누락 확인</title>
-  <link rel="stylesheet" href="./style.css?v=12">
+  <link rel="stylesheet" href="./style.css?v=14">
 </head>
 <body>
   <main class="workspace">
@@ -37,6 +37,16 @@
           <div class="channel-arrow">→</div>
         </button>
 
+        <button class="channel-card like" data-mode="like">
+          <div class="channel-icon">♥</div>
+          <div class="channel-copy">
+            <span>INSTAGRAM LIKE</span>
+            <h2>인스타 좋아요 확인</h2>
+            <p>좋아요 목록 캡처를 올리면 참여자와 자동 비교</p>
+          </div>
+          <div class="channel-arrow">→</div>
+        </button>
+
         <button class="channel-card naver" data-mode="naver">
           <div class="channel-icon">N</div>
           <div class="channel-copy">
@@ -50,7 +60,7 @@
 
       <div class="home-note">
         <b>공통 기능</b>
-        <span>여러 방 명단 합산 · 중복 참여 횟수 계산 · 프패/운영진 자동 제외</span>
+        <span>댓글·좋아요·블로그 캡처 분석 · 프패/운영진 자동 제외</span>
       </div>
     </section>
 
@@ -81,6 +91,25 @@
           </div>
 
           <textarea id="participants" class="main-input"></textarea>
+
+          <div id="likeRosterBox" class="like-roster-box hidden">
+            <strong>카톡 투표 캡처로 참여자 만들기</strong>
+            <p>카톡 투표 화면은 Instagram 아이디가 …으로 잘려도 괜찮아요. 아래 등록 명단의 <b>카톡 닉네임 ↔ Instagram 아이디</b>를 이용해 전체 아이디를 찾아옵니다.</p>
+            <label class="dropzone mini-dropzone" for="voteImages">
+              <span class="camera">＋</span>
+              <div><strong>카톡 투표 현황 캡처 추가</strong><small>참여자 닉네임이 보이게 여러 장 가능</small></div>
+            </label>
+            <input id="voteImages" type="file" accept="image/*" multiple hidden>
+            <div id="voteFileList" class="thumb-list empty">선택된 투표 캡처가 없습니다.</div>
+
+            <label class="mapping-label">
+              <span>여우방 등록 명단</span>
+              <small>예: 검이 / hagye_1234 또는 검이 @hagye_1234</small>
+              <textarea id="memberMapping" rows="7" placeholder="검이 / hagye_1234&#10;고담 / eunmin_1234&#10;기마룡 / aron_1234"></textarea>
+            </label>
+            <button id="voteExtractBtn" class="run-btn secondary-run" type="button">투표 참여자 자동 만들기</button>
+            <div id="voteExtractStatus" class="notice hidden"></div>
+          </div>
 
           <div class="helper-row">
             <span id="recognizedCountMirror">0명 인식</span>
@@ -210,6 +239,6 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-  <script src="./app.js?v=12"></script>
+  <script src="./app.js?v=14"></script>
 </body>
 </html>

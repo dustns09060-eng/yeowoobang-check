@@ -110,3 +110,20 @@ footer{text-align:center;color:#918d85;font-size:9px;padding:24px 0 0}
 
 .id-cloud em.count-badge{color:#8a5b12;background:#fff1c9;padding:2px 6px;border-radius:999px;margin-left:5px}
 .count-detail{display:block!important;margin-top:5px;color:rgba(255,255,255,.72)}
+
+.channel-card.like .channel-icon{background:#20211f}
+@media(min-width:721px){
+  .channel-grid{grid-template-columns:repeat(3,1fr)}
+  .channel-card{grid-template-columns:1fr;align-content:start;min-height:220px}
+  .channel-card .channel-arrow{justify-self:end}
+}
+
+.like-roster-box{margin:16px 0 4px;padding:16px;border:1px solid rgba(32,33,31,.12);border-radius:18px;background:#faf7f2}
+.like-roster-box>strong{display:block;font-size:16px;margin-bottom:6px}
+.like-roster-box>p{font-size:13px;line-height:1.55;margin:0 0 12px;color:#625d56}
+.mini-dropzone{min-height:auto;padding:13px;margin-bottom:10px}
+.mapping-label{display:block;margin-top:12px}
+.mapping-label span{display:block;font-weight:800;margin-bottom:3px}
+.mapping-label small{display:block;color:#81796f;margin-bottom:7px}
+.mapping-label textarea{width:100%;box-sizing:border-box;border:1px solid rgba(32,33,31,.14);border-radius:14px;padding:12px;background:#fff;font:inherit}
+.secondary-run{margin-top:10px;background:#292a27}
