@@ -81,23 +81,57 @@
 
     if(mode === 'instagram'){
       let candidate = '';
-      const at = body.match(/@([A-Za-z0-9._]{1,30})/);
-      if(at) candidate = at[1];
-      if(!candidate && body.includes('/')) candidate = cleanIg(body.split('/').pop());
+      let nickname = '';
 
+      // 1) "닉네임/아이디 (메모)" 형식 우선 처리
+      // 슬래시 뒤에서 첫 번째 공백/괄호/한글 메모 전까지만 Instagram 아이디로 사용
+      if(body.includes('/')){
+        const slashIndex = body.indexOf('/');
+        nickname = body.slice(0, slashIndex).trim();
+
+        const right = body.slice(slashIndex + 1).trim();
+
+        // 실제 Instagram username 규칙: 영문/숫자/._, 최대 30자
+        // 첫 글자도 "_" 또는 "." 가능하도록 허용
+        const m = right.match(/^([A-Za-z0-9._]{1,30})/);
+        if(m) candidate = m[1];
+      }
+
+      // 2) @아이디 형식
       if(!candidate){
-        const tokens = body.split(/\s+/).map(cleanIg).filter(Boolean);
+        const at = body.match(/@([A-Za-z0-9._]{1,30})/);
+        if(at) candidate = at[1];
+      }
+
+      // 3) 슬래시가 없는 "닉네임 아이디" 형식
+      if(!candidate){
+        const tokens = body.split(/\s+/);
         for(let i=tokens.length-1;i>=0;i--){
-          if(isIg(tokens[i])){ candidate=tokens[i]; break; }
+          const token = String(tokens[i] || '')
+            .replace(/^@/, '')
+            .replace(/\([^)]*$/, '')
+            .replace(/[^\w.]+$/g, '')
+            .trim();
+
+          if(isIg(token)){
+            candidate = token;
+            break;
+          }
         }
       }
 
-      candidate = cleanIg(candidate);
+      candidate = String(candidate || '').trim();
+
+      // 괄호/메모가 바로 붙은 경우 한 번 더 안전 정리
+      candidate = candidate
+        .split('(')[0]
+        .split('[')[0]
+        .split('{')[0]
+        .trim();
+
       if(!isIg(candidate)){
         return {warning:true,lineNo,original,reason:'Instagram 아이디를 찾지 못함'};
       }
-
-      let nickname = body.includes('/') ? body.split('/')[0].trim() : '';
 
       return {
         no:numberMatch?Number(numberMatch[1]):null,
