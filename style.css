@@ -294,3 +294,32 @@ footer{text-align:center;color:#918d85;font-size:9px;padding:24px 0 0}
 .collector-recognized-head strong{font-size:11px}
 .collector-recognized-head span{font-size:10px;color:#1f4b3d;font-weight:900}
 .collector-recognized .id-cloud{margin-bottom:9px}
+
+.review-subhead{
+  margin-top:12px;
+  padding-top:10px;
+  border-top:1px solid #e4e0da;
+}
+.review-subhead strong{display:block;font-size:10px;color:#8a5e2f}
+.review-subhead small{display:block;margin-top:2px;font-size:8px;line-height:1.4;color:#8b8176}
+.review-list{display:grid;gap:6px;margin-top:7px}
+.review-item{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 9px;
+  border-radius:10px;
+  background:#fff8e8;
+  border:1px solid #ead8ae;
+}
+.review-item input{width:17px;height:17px;flex:none}
+.review-item span{display:block;min-width:0}
+.review-item b{display:block;font-size:10px}
+.review-item small{display:block;margin-top:2px;font-size:8px;color:#8b7356}
+.missing-row.needs-review{
+  background:#fff9e9;
+}
+.missing-row.needs-review .missing-badge{
+  background:#f4d991!important;
+  color:#76561d!important;
+}

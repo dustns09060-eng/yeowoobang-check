@@ -10,6 +10,7 @@
   let lastRecognized = [];
   let selectedCommentVideo = null;
   let videoRecognized = [];
+  let videoReview = [];
 
   // 여우방 운영진: Instagram 검사 시 자동 제외
   const INSTAGRAM_ADMIN_IDS = [
@@ -416,6 +417,40 @@
     return canvas;
   }
 
+
+  function nearestParticipantForOcrToken(token, items){
+    const t=normalizeIg(token);
+    if(!t || t.length<4) return null;
+
+    let best=null;
+    let bestDist=99;
+
+    for(const p of items){
+      const cand=p.norm;
+      if(!cand) continue;
+      if(Math.abs(cand.length-t.length)>2) continue;
+
+      const d=levenshtein(cand,t);
+      if(d<bestDist){
+        bestDist=d;
+        best=p;
+      }
+    }
+
+    const maxDist = t.length>=8 ? 2 : 1;
+    return best && bestDist<=maxDist ? {item:best,distance:bestDist,token:t} : null;
+  }
+
+  function extractPossibleIgTokens(text){
+    const clean=String(text||'')
+      .replace(/\s*([._])\s*/g,'$1')
+      .toLowerCase();
+
+    const tokens=clean.match(/@?[a-z0-9._]{4,30}/g)||[];
+    return [...new Set(tokens.map(x=>x.replace(/^@/,'')))]
+      .filter(x=>isIg(x) && !/^https?$/.test(x) && !/^(www|instagram|reply|like|likes|hours?|minutes?)$/.test(x));
+  }
+
   async function analyzeCommentVideo(){
     if(mode!=='collector') return;
 
@@ -478,6 +513,7 @@
       }catch(_){}
 
       const matchedSet=new Set();
+      const reviewMap=new Map();
 
       for(let i=0;i<times.length;i++){
         const pct=5+(i/times.length)*90;
@@ -491,19 +527,53 @@
         const matches=recognizeInstagram(text,parsed.items);
         matches.forEach(id=>matchedSet.add(normalizeIg(id)));
 
+        // 정확 매칭은 아니지만 OCR상 매우 비슷한 아이디는 '확인 필요' 후보로만 보관
+        const tokens=extractPossibleIgTokens(text);
+        for(const token of tokens){
+          const near=nearestParticipantForOcrToken(token,parsed.items);
+          if(!near) continue;
+          const id=near.item.norm;
+          if(matchedSet.has(id)) continue;
+          if(!reviewMap.has(id) || near.distance<reviewMap.get(id).distance){
+            reviewMap.set(id,{
+              norm:id,
+              target:near.item.target,
+              nickname:near.item.nickname||'',
+              seenAs:near.token,
+              distance:near.distance
+            });
+          }
+        }
+
         // 이미 검사 대상 대부분을 찾았다면 조기 종료
         const expected=parsed.items.filter(x=>!x.autoFreePass).length;
         if(expected>0 && matchedSet.size>=expected) break;
       }
 
       videoRecognized=[...matchedSet].sort();
+      videoReview=[...reviewMap.values()]
+        .filter(x=>!matchedSet.has(x.norm))
+        .sort((a,b)=>a.distance-b.distance || a.norm.localeCompare(b.norm));
+
       $('videoRecognizedCount').textContent=videoRecognized.length+'명';
 
       const parsedMap=new Map(parsed.items.map(x=>[x.norm,x.target]));
-      $('videoRecognizedList').innerHTML=videoRecognized.length
+      const exactHtml=videoRecognized.length
         ? videoRecognized.map(id=>`<span>@${esc(parsedMap.get(id)||id)}</span>`).join('')
-        : '<small>인식된 아이디가 없습니다.</small>';
+        : '<small>정확히 인식된 아이디가 없습니다.</small>';
 
+      const reviewHtml=videoReview.length
+        ? `<div class="review-subhead"><strong>확인 필요 ${videoReview.length}명</strong><small>OCR이 비슷하게 읽은 후보 · 누락으로 자동 처리하지 않음</small></div>
+           <div class="review-list">
+             ${videoReview.map(x=>`
+               <label class="review-item">
+                 <input type="checkbox" class="review-check" data-id="${esc(x.norm)}">
+                 <span><b>@${esc(x.target)}</b><small>영상 인식: ${esc(x.seenAs)}</small></span>
+               </label>`).join('')}
+           </div>`
+        : '';
+
+      $('videoRecognizedList').innerHTML=exactHtml+reviewHtml;
       $('videoRecognizedWrap').classList.remove('hidden');
 
       if(videoRecognized.length===0){
@@ -511,7 +581,7 @@
         $('videoHint').textContent='전원을 누락자로 처리하지 않았습니다. 스크롤 속도를 늦춰 다시 녹화하거나 캡처 방식으로 확인해주세요.';
       }else{
         setVideoProgress(`완료 · ${videoRecognized.length}명 인식`,100);
-        $('videoHint').textContent='인식된 아이디 목록을 확인한 뒤 누락자 비교를 눌러주세요.';
+        $('videoHint').textContent=videoReview.length ? '정확 인식과 확인 필요 후보를 검토한 뒤 누락자 비교를 눌러주세요.' : '인식된 아이디 목록을 확인한 뒤 누락자 비교를 눌러주세요.';
       }
 
       logLocalEvent('video_collector_done',`${videoRecognized.length} recognized`);
@@ -530,11 +600,37 @@
   }
 
   function compareVideoRecognized(){
-    if(!videoRecognized.length){
-      alert('영상에서 인식된 아이디가 없습니다. 자동 누락 판정은 하지 않습니다.');
+    const checked=[...document.querySelectorAll('.review-check:checked')]
+      .map(el=>normalizeIg(el.dataset.id))
+      .filter(Boolean);
+
+    const recognized=[...new Set([...videoRecognized,...checked])];
+
+    if(!recognized.length){
+      alert('확정된 댓글 작성자가 없습니다. 자동 누락 판정은 하지 않습니다.');
       return;
     }
-    runComparison(videoRecognized,'대량 댓글 화면 녹화 분석');
+
+    // 확인 필요로 남겨둔 사람은 '누락'으로 자동 확정하지 않기 위해 비교 결과에서 별도 보류 처리
+    const unresolved=new Set(
+      videoReview
+        .map(x=>x.norm)
+        .filter(id=>!checked.includes(id))
+    );
+
+    runComparison(recognized,'대량 댓글 화면 녹화 분석');
+
+    if(unresolved.size){
+      // 현재 결과에서 unresolved를 누락자로 표시한 항목을 '확인 필요' 상태로 변경
+      document.querySelectorAll('[data-missing-id]').forEach(el=>{
+        const id=normalizeIg(el.getAttribute('data-missing-id'));
+        if(unresolved.has(id)){
+          el.classList.add('needs-review');
+          const badge=el.querySelector('.missing-badge');
+          if(badge) badge.textContent='확인 필요';
+        }
+      });
+    }
   }
 
   function parseParticipantLine(line, lineNo){
@@ -639,160 +735,97 @@
     };
   }
 
+  function isInstagramUrlLine(line){
+    const s=String(line||'').trim().toLowerCase();
+    return /^https?:\/\/(www\.)?instagram\.com\/(p|reel|tv)\//.test(s)
+      || /^www\.instagram\.com\/(p|reel|tv)\//.test(s)
+      || /^instagram\.com\/(p|reel|tv)\//.test(s);
+  }
+
+  function isAnyUrlLike(line){
+    const s=String(line||'').trim().toLowerCase();
+    return /^(https?:\/\/|www\.)/.test(s);
+  }
+
   function parseParticipants(text){
-    const rows = String(text||'').split(/\r?\n/);
-    const items = [], warnings = [];
+    const raw=String(text||'');
+    const lines=raw.split(/\r?\n/);
+    const parsed=[];
+    const warnings=[];
+    let pendingPrefix=null;
 
-    rows.forEach((line,i)=>{
-      if(!line.trim()) return;
-      const p = parseParticipantLine(line,i+1);
-      if(!p) return;
-      p.warning ? warnings.push(p) : items.push(p);
-    });
+    for(let i=0;i<lines.length;i++){
+      let line=String(lines[i]||'').trim();
+      if(!line) continue;
 
-    // 같은 아이디가 여러 일반 품앗이방에 있으면 참여 횟수만큼 댓글이 필요합니다.
-    // 소굴방 명단은 이 입력에 넣지 않는 방식으로 사용합니다.
-    const grouped = new Map();
-    items.forEach(x=>{
-      if(!grouped.has(x.norm)){
-        grouped.set(x.norm,{...x, requiredCount:1, entries:[x]});
+      // 게시물 링크는 참여자가 아님. 무조건 제외.
+      if(isInstagramUrlLine(line) || isAnyUrlLike(line)){
+        continue;
+      }
+
+      // 링크가 줄바꿈되어 '/www.instagram...'처럼 들어온 경우도 제외
+      if(/^\/?www\.instagram\.com\/(p|reel|tv)\//i.test(line)
+        || /^\/?instagram\.com\/(p|reel|tv)\//i.test(line)){
+        continue;
+      }
+
+      // 숫자/기호만 있는 줄 제외
+      if(/^[\d\s.)\-–—·•]+$/.test(line)) continue;
+
+      const item=parseParticipantLine(line,i+1);
+      if(!item) continue;
+
+      // parseParticipantLine가 잘못 URL 조각을 username으로 본 경우 방지
+      if(item.target && (
+        /^https?$/i.test(item.target)
+        || /^www$/i.test(item.target)
+        || /instagram\.com/i.test(item.target)
+        || /^p$/i.test(item.target)
+        || /^reel$/i.test(item.target)
+      )){
+        continue;
+      }
+
+      // 일반 Instagram 계열 모드에서는 실제 username 형식만 허용
+      if(mode!=='naver'){
+        const n=normalizeIg(item.target);
+        if(!isIg(n)){
+          warnings.push({line:i+1,text:line,reason:'Instagram 아이디를 찾지 못함'});
+          continue;
+        }
+        item.target=item.target.replace(/^@/,'');
+        item.norm=n;
+      }
+
+      parsed.push(item);
+    }
+
+    // 같은 계정이 여러 방/줄에 반복될 수 있으므로 requiredCount 합산
+    const merged=new Map();
+    for(const x of parsed){
+      const key=x.norm;
+      if(!key) continue;
+
+      if(!merged.has(key)){
+        merged.set(key,{
+          ...x,
+          requiredCount:1,
+          sourceLines:[x.lineNo]
+        });
       }else{
-        const g=grouped.get(x.norm);
-        g.requiredCount += 1;
-        g.entries.push(x);
-        // 한 줄이라도 프패면 해당 아이디는 프패로 처리
-        g.autoFreePass = g.autoFreePass || x.autoFreePass;
-      }
-    });
-
-    return {items:[...grouped.values()],warnings,totalEntries:items.length};
-  }
-
-  function parseIdList(text){
-    const normalizer = (mode === 'instagram' || mode === 'personal' || mode === 'like' || mode === 'mone') ? normalizeIg : normalizeBlog;
-    return new Set(
-      String(text||'')
-        .split(/[\n,]+/)
-        .map(x=>normalizer(x))
-        .filter(Boolean)
-    );
-  }
-
-  function renderParsed(){
-    if(!mode) return;
-
-    const p = parseParticipants($('participants').value);
-    $('recognizedCount').textContent = p.totalEntries ?? p.items.length;
-    $('recognizedCountMirror').textContent = (p.totalEntries ?? p.items.length)+'건 인식';
-    $('warningCount').textContent = p.warnings.length;
-
-    $('extractedList').innerHTML = p.items.length
-      ? p.items.map(x=>{
-          const isAdmin = (mode==='instagram'||mode==='personal'||mode==='like'||mode==='mone') && INSTAGRAM_ADMIN_IDS.includes(normalizeIg(x.target));
-          return `<span>${(mode==='instagram'||mode==='personal'||mode==='like'||mode==='mone')?'@':''}${esc(x.target)}${x.requiredCount>1?`<em class="count-badge">${x.requiredCount}회</em>`:''}${isAdmin?'<em class="admin-badge">운영진</em>':''}${x.autoFreePass?'<em>프패</em>':''}</span>`;
-        }).join('')
-      : '<small>추출된 대상이 없습니다.</small>';
-
-    if(p.warnings.length){
-      $('parseWarningsWrap').classList.remove('hidden');
-      $('parseWarnings').innerHTML = p.warnings.map(w=>`<div>${w.lineNo}. ${esc(w.original)} · ${esc(w.reason)}</div>`).join('');
-    }else{
-      $('parseWarningsWrap').classList.add('hidden');
-    }
-  }
-
-  function runComparison(recognizedNames, sourceLabel){
-    const parsed = parseParticipants($('participants').value);
-    if(!parsed.items.length) throw new Error('참여자 명단을 먼저 입력해주세요.');
-
-    const normalizer = (mode === 'instagram' || mode === 'personal' || mode === 'like' || mode === 'mone') ? normalizeIg : normalizeBlog;
-    const recognizedCounts = new Map();
-    recognizedNames.map(normalizer).filter(Boolean).forEach(id=>{
-      recognizedCounts.set(id,(recognizedCounts.get(id)||0)+1);
-    });
-
-    const excluded = parseIdList($('excludeIds').value);
-    if(mode === 'instagram' || mode === 'personal' || mode === 'like' || mode === 'mone'){
-      INSTAGRAM_ADMIN_IDS.forEach(id => excluded.add(normalizeIg(id)));
-    }
-    const owner = normalizer($('ownerId').value);
-    if(owner) excluded.add(owner);
-
-    const freePass = parseIdList($('freePassIds').value);
-    parsed.items.filter(x=>x.autoFreePass).forEach(x=>freePass.add(x.norm));
-
-    const excludedItems = parsed.items.filter(x=>excluded.has(x.norm));
-    const active = parsed.items.filter(x=>!excluded.has(x.norm));
-    const freePassItems = active.filter(x=>freePass.has(x.norm));
-    const checkTargets = active.filter(x=>!freePass.has(x.norm));
-
-    const completed = [];
-    const missing = [];
-    checkTargets.forEach(x=>{
-      const required = (mode === 'like' || mode === 'mone') ? 1 : (x.requiredCount || 1);
-      const found = recognizedCounts.get(x.norm) || 0;
-      const shortage = Math.max(0,required-found);
-      const row={...x,requiredCount:required,foundCount:found,shortage};
-      (shortage===0?completed:missing).push(row);
-    });
-
-    currentMissing = missing.map(x=>x.target);
-
-    $('statParticipants').textContent = parsed.totalEntries ?? parsed.items.length;
-    $('statCommented').textContent = completed.length;
-    $('statMissing').textContent = missing.length;
-    $('statExcluded').textContent = excludedItems.length;
-    $('statFreePass').textContent = freePassItems.length;
-    $('missingTitleCount').textContent = missing.length+'명';
-    $('checkedAt').textContent = new Date().toLocaleString('ko-KR');
-    $('checkedPost').textContent = sourceLabel||'';
-
-    $('missingList').innerHTML = !missing.length
-      ? mode === 'like' ? '<div class="all-clear">좋아요 누락자가 없습니다 ✓</div>' : '<div class="all-clear">누락자가 없습니다 ✓</div>'
-      : missing.map(x=>`
-          <div class="missing-item">
-            <div>
-              <small>${x.no?x.no+'. ':''}${esc(x.nickname||'')}</small>
-              <strong>${(mode==='instagram'||mode==='personal'||mode==='like'||mode==='mone')?'@':''}${esc(x.target)}</strong>
-              <small class="count-detail">필요 ${x.requiredCount}회 · 확인 ${x.foundCount}회 · ${x.shortage}회 부족</small>
-            </div>
-            <span>${x.shortage}회 부족</span>
-          </div>`).join('');
-
-    $('resultCard').classList.remove('hidden');
-    $('resultCard').scrollIntoView({behavior:'smooth',block:'start'});
-  }
-
-  function renderFileList(){
-    $('imageCount').textContent = selectedFiles.length;
-    const box = $('fileList');
-
-    if(!selectedFiles.length){
-      box.className = 'thumb-list empty';
-      box.textContent = '선택된 캡처가 없습니다.';
-      return;
-    }
-
-    box.className = 'thumb-list';
-    box.innerHTML = selectedFiles.map((f,i)=>`
-      <div class="file-chip">
-        <b>${i+1}</b>
-        <span>${esc(f.name)}</span>
-        <small>${Math.max(1,Math.round(f.size/1024))}KB</small>
-      </div>`).join('');
-  }
-
-  function levenshtein(a,b){
-    const n=b.length,dp=Array.from({length:n+1},(_,i)=>i);
-    for(let i=1;i<=a.length;i++){
-      let prev=dp[0]; dp[0]=i;
-      for(let j=1;j<=n;j++){
-        const t=dp[j];
-        dp[j]=Math.min(dp[j]+1,dp[j-1]+1,prev+(a[i-1]===b[j-1]?0:1));
-        prev=t;
+        const m=merged.get(key);
+        m.requiredCount=(m.requiredCount||1)+1;
+        m.sourceLines.push(x.lineNo);
+        // 프패/운영진 표시는 하나라도 있으면 유지
+        m.autoFreePass=!!(m.autoFreePass||x.autoFreePass);
+        m.isOperator=!!(m.isOperator||x.isOperator);
       }
     }
-    return dp[n];
+
+    return {
+      items:[...merged.values()],
+      warnings
+    };
   }
 
   function recognizeInstagram(text,items){
@@ -1010,6 +1043,7 @@
     selectedFiles = [];
     selectedCommentVideo=null;
     videoRecognized=[];
+    videoReview=[];
     currentMissing = [];
     lastRecognized = [];
 
@@ -1078,6 +1112,7 @@
   $('commentVideo').addEventListener('change',e=>{
     selectedCommentVideo=(e.target.files&&e.target.files[0])||null;
     videoRecognized=[];
+    videoReview=[];
     $('videoRecognizedWrap').classList.add('hidden');
     $('videoProgressWrap').classList.add('hidden');
 
