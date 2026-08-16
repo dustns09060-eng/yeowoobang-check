@@ -21,7 +21,7 @@
     if(!isUsername(candidate)) return {warning:true,lineNo,original,reason:'Instagram 아이디를 찾지 못함'};
     const numberMatch=original.match(/^\s*(\d+)/);
     let nickname=body.includes('/')?body.split('/')[0].trim():'';
-    return {no:numberMatch?Number(numberMatch[1]):null,nickname,username:candidate,usernameNorm:normalize(candidate),usernameSkeleton:skeleton(candidate)};
+    return {no:numberMatch?Number(numberMatch[1]):null,nickname,username:candidate,usernameNorm:normalize(candidate),usernameSkeleton:skeleton(candidate),autoFreePass:/프배/.test(body)};
   }
 
   function parseParticipants(text){
@@ -41,7 +41,7 @@
     $('recognizedCountMirror').textContent=p.items.length+'명';
     const box=$('extractedList');
     if(!p.items.length){box.className='scroll-list empty';box.textContent='명단을 입력하면 자동 추출됩니다.';}
-    else{box.className='scroll-list';box.innerHTML=p.items.map(x=>`<div>@${esc(x.username)}</div>`).join('');}
+    else{box.className='scroll-list';box.innerHTML=p.items.map(x=>`<div>@${esc(x.username)}${x.autoFreePass?' <small class="auto-pass">프배 자동</small>':''}</div>`).join('');}
     if(p.warnings.length){
       $('parseWarningsWrap').classList.remove('hidden'); $('warningCount').textContent=p.warnings.length+'줄';
       $('parseWarnings').innerHTML=p.warnings.map(w=>`<div><strong>${w.lineNo}. ${esc(w.original)}</strong><br><small>${esc(w.reason)}</small></div>`).join('<hr>');
@@ -58,6 +58,9 @@
     if(owner) excluded.add(owner);
 
     const freePass=parseIdList($('freePassIds').value);
+    // 닉네임/명단 텍스트에 '프배'가 포함된 참여자는 자동 프리패스
+    parsed.items.filter(x=>x.autoFreePass).forEach(x=>freePass.add(x.usernameNorm));
+
     const excludedItems=parsed.items.filter(x=>excluded.has(x.usernameNorm));
     const active=parsed.items.filter(x=>!excluded.has(x.usernameNorm));
     const freePassItems=active.filter(x=>freePass.has(x.usernameNorm));
