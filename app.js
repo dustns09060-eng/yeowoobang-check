@@ -6,11 +6,26 @@
   let selectedFiles = [];
   let lastRecognized = [];
 
+  // 여우방 운영진: Instagram 검사 시 자동 제외
+  const INSTAGRAM_ADMIN_IDS = [
+    'somy_jee',
+    'yeolmu.___.v',
+    'da_in_9.4',
+    'bebehome_seol',
+    'my_tinykitty',
+    'j_dragon_mom',
+    'gani_meal',
+    'wooha_hada'
+  ].map(v => String(v).toLowerCase());
+
   const esc = s => String(s||'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const normalizeIg = v => String(v||'').trim().replace(/^@/,'').toLowerCase();
   const normalizeBlog = v => String(v||'').trim().toLowerCase().replace(/\s+/g,'');
   const cleanIg = raw => String(raw||'').trim().replace(/^@/,'').replace(/[^\w.]+$/g,'');
   const igSkeleton = v => normalizeIg(v).replace(/[._]/g,'').replace(/[^a-z0-9]/g,'');
+  const igOcrCanonical = v => igSkeleton(v)
+    .replace(/l/g,'1')
+    .replace(/0/g,'o');
   const isIg = s => /^[a-z0-9._]{1,30}$/i.test(s||'');
 
   function configForMode(){
@@ -213,7 +228,10 @@
     $('warningCount').textContent = p.warnings.length;
 
     $('extractedList').innerHTML = p.items.length
-      ? p.items.map(x=>`<span>${mode==='instagram'?'@':''}${esc(x.target)}${x.autoFreePass?'<em>프패</em>':''}</span>`).join('')
+      ? p.items.map(x=>{
+          const isAdmin = mode==='instagram' && INSTAGRAM_ADMIN_IDS.includes(normalizeIg(x.target));
+          return `<span>${mode==='instagram'?'@':''}${esc(x.target)}${isAdmin?'<em class="admin-badge">운영진</em>':''}${x.autoFreePass?'<em>프패</em>':''}</span>`;
+        }).join('')
       : '<small>추출된 대상이 없습니다.</small>';
 
     if(p.warnings.length){
@@ -232,6 +250,12 @@
     const recognized = new Set(recognizedNames.map(normalizer).filter(Boolean));
 
     const excluded = parseIdList($('excludeIds').value);
+
+    // Instagram 모드에서는 운영진을 자동 제외
+    if(mode === 'instagram'){
+      INSTAGRAM_ADMIN_IDS.forEach(id => excluded.add(normalizeIg(id)));
+    }
+
     const owner = normalizer($('ownerId').value);
     if(owner) excluded.add(owner);
 
@@ -308,25 +332,41 @@
       .replace(/[|]/g,'l')
       .replace(/\s*([._])\s*/g,'$1');
 
-    const raw = [...lower.matchAll(/@?([a-z0-9][a-z0-9._]{1,29})/g)]
+    // username 후보를 넓게 수집
+    const raw = [...lower.matchAll(/@?([._a-z0-9][._a-z0-9]{1,29})/g)]
       .map(m=>normalizeIg(m[1]));
 
     const rawSet = new Set(raw);
     const skeletons = [...new Set(raw.map(igSkeleton).filter(Boolean))];
+    const canonicalSkeletons = [...new Set(raw.map(igOcrCanonical).filter(Boolean))];
+
     const allSkeleton = igSkeleton(lower);
+    const allCanonical = igOcrCanonical(lower);
     const matched = new Set();
 
     items.forEach(p=>{
+      const targetCanonical = igOcrCanonical(p.norm);
+
+      // 1. 정확한 username
       if(rawSet.has(p.norm)){
         matched.add(p.norm);
         return;
       }
 
+      // 2. 점/밑줄을 제외한 정확 비교
       if(p.skeleton.length>=4 && (skeletons.includes(p.skeleton) || allSkeleton.includes(p.skeleton))){
         matched.add(p.norm);
         return;
       }
 
+      // 3. OCR에서 1/l, 0/o 혼동을 보정한 비교
+      if(targetCanonical.length>=4 &&
+         (canonicalSkeletons.includes(targetCanonical) || allCanonical.includes(targetCanonical))){
+        matched.add(p.norm);
+        return;
+      }
+
+      // 4. 긴 아이디는 1~2자 OCR 오독 허용
       if(p.skeleton.length>=6){
         let best=99;
         for(const s of skeletons){
@@ -334,8 +374,18 @@
           best=Math.min(best,levenshtein(p.skeleton,s));
           if(best===0) break;
         }
+
+        let bestCanonical=99;
+        for(const s of canonicalSkeletons){
+          if(Math.abs(s.length-targetCanonical.length)>2) continue;
+          bestCanonical=Math.min(bestCanonical,levenshtein(targetCanonical,s));
+          if(bestCanonical===0) break;
+        }
+
         const threshold=p.skeleton.length>=11?2:1;
-        if(best<=threshold) matched.add(p.norm);
+        if(best<=threshold || bestCanonical<=threshold){
+          matched.add(p.norm);
+        }
       }
     });
 
@@ -371,13 +421,29 @@
 
   async function preprocessImage(file){
     const bitmap = await createImageBitmap(file);
-    const maxWidth = 2000;
-    const scale = Math.min(1.35,maxWidth/bitmap.width);
+
+    // 모바일 댓글 캡처의 작은 아이디 글자를 OCR이 더 잘 읽도록 확대
+    const targetWidth = Math.min(2600, Math.max(1800, bitmap.width * 1.8));
+    const scale = targetWidth / bitmap.width;
 
     const canvas = document.createElement('canvas');
     canvas.width = Math.max(1,Math.round(bitmap.width*scale));
     canvas.height = Math.max(1,Math.round(bitmap.height*scale));
-    canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);
+
+    const ctx = canvas.getContext('2d', {willReadFrequently:true});
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);
+
+    // 가벼운 흑백 + 대비 보정
+    const img = ctx.getImageData(0,0,canvas.width,canvas.height);
+    const d = img.data;
+    for(let i=0;i<d.length;i+=4){
+      let gray = Math.round(d[i]*0.299 + d[i+1]*0.587 + d[i+2]*0.114);
+      gray = gray < 150 ? Math.max(0, gray - 28) : Math.min(255, gray + 18);
+      d[i]=d[i+1]=d[i+2]=gray;
+    }
+    ctx.putImageData(img,0,0);
 
     return canvas;
   }
@@ -406,6 +472,15 @@
 
       const lang = mode === 'naver' ? 'kor+eng' : 'eng';
       worker = await Tesseract.createWorker(lang);
+
+      if(mode === 'instagram'){
+        try{
+          await worker.setParameters({
+            preserve_interword_spaces: '1',
+            tessedit_pageseg_mode: '6'
+          });
+        }catch(_){}
+      }
 
       const allMatched = new Set();
 
