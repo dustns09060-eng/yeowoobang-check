@@ -332,7 +332,7 @@
       if(d.ok && Array.isArray(d.comments) && d.comments.length>0){
         const names=[...new Set(d.comments.map(c=>normalizeIg(c.username)).filter(Boolean))];
         status.className='hybrid-status success';
-        status.textContent=`자동 조회 성공 · 댓글 ${d.commentCount||d.comments.length}개 · 작성자 ${names.length}명 확인`;
+        status.textContent=`자동 조회 성공 · 댓글 작성자 ${names.length}명 확인 (댓글 ${d.commentCount||d.comments.length}개)`;
         runComparison(names,`Instagram API 자동 확인 · ${postUrl}`);
         return;
       }
@@ -888,62 +888,6 @@
     };
   }
 
-  function runComparison(recognizedValues, sourceLabel){
-    const parsed = parseParticipants($('participants').value);
-    if(!parsed.items.length){
-      alert('참여자 명단을 먼저 입력해주세요.');
-      return;
-    }
-
-    const normalizer = mode === 'naver' ? normalizeBlog : normalizeIg;
-    const recognized = new Set((recognizedValues || []).map(normalizer).filter(Boolean));
-    const owner = normalizer($('ownerId')?.value || '');
-    const manualExcluded = new Set(String($('excludeIds')?.value || '').split(/[\\s,]+/).map(normalizer).filter(Boolean));
-    const manualFreePass = new Set(String($('freePassIds')?.value || '').split(/[\\s,]+/).map(normalizer).filter(Boolean));
-    const adminSet = new Set(mode === 'naver' ? [] : INSTAGRAM_ADMIN_IDS.map(normalizeIg));
-
-    const excluded=[];
-    const freePass=[];
-    const eligible=[];
-
-    parsed.items.forEach(item=>{
-      const id=item.norm;
-      if(!id) return;
-      if(owner && id===owner){ excluded.push(item); return; }
-      if(adminSet.has(id) || manualExcluded.has(id)){ excluded.push(item); return; }
-      if(item.autoFreePass || manualFreePass.has(id)){ freePass.push(item); return; }
-      eligible.push(item);
-    });
-
-    const commented = eligible.filter(item=>recognized.has(item.norm));
-    const missing = eligible.filter(item=>!recognized.has(item.norm));
-    currentMissing = missing.map(item=>item.target);
-
-    $('recognizedCount').textContent=String(recognized.size);
-    $('recognizedCountMirror').textContent=`${recognized.size}명 인식`;
-    $('statParticipants').textContent=String(parsed.items.length);
-    $('statCommented').textContent=String(commented.length);
-    $('statMissing').textContent=String(missing.length);
-    $('statExcluded').textContent=String(excluded.length);
-    $('statFreePass').textContent=String(freePass.length);
-    $('missingTitleCount').textContent=`${missing.length}명`;
-    $('checkedPost').textContent=sourceLabel || '확인 결과';
-    $('checkedAt').textContent=new Date().toLocaleString('ko-KR');
-
-    if(missing.length){
-      $('missingList').innerHTML=missing.map(item=>{
-        const prefix=mode==='naver'?'':'@';
-        const nick=item.nickname ? `<small>${esc(item.nickname)}</small>` : '';
-        return `<div class="missing-item" data-missing-id="${esc(item.norm)}"><span><b>${prefix}${esc(item.target)}</b>${nick}</span><em class="missing-badge">미작성</em></div>`;
-      }).join('');
-    }else{
-      $('missingList').innerHTML='<div class="all-done">누락자가 없습니다. 전원 확인됐어요.</div>';
-    }
-
-    $('resultCard').classList.remove('hidden');
-    $('resultCard').scrollIntoView({behavior:'smooth',block:'start'});
-  }
-
   function recognizeInstagram(text,items){
     const lines=String(text||'').toLowerCase().split(/\r?\n/);
     const counts=new Map(items.map(p=>[p.norm,0]));
@@ -1143,6 +1087,83 @@
     $('ocrResultCount').textContent = lastRecognized.length+'명';
 
     runComparison(lastRecognized,'OCR 결과 수정 후 재검사');
+  }
+
+  function parseIdList(text, normalizer){
+    return String(text||'')
+      .split(/[\s,]+/)
+      .map(v=>String(v||'').trim())
+      .filter(Boolean)
+      .map(v=>normalizer(v))
+      .filter(Boolean);
+  }
+
+  function runComparison(recognizedValues, sourceLabel){
+    const parsed=parseParticipants($('participants').value);
+    const participants=parsed.items || [];
+    if(!participants.length){
+      alert('참여자 명단을 먼저 입력해주세요.');
+      return;
+    }
+
+    const isInstaMode = mode !== 'naver';
+    const normalizer = isInstaMode ? normalizeIg : normalizeBlog;
+    const recognized = new Set((recognizedValues || []).map(v=>normalizer(v)).filter(Boolean));
+
+    // 내 계정 / 운영진 / 직접 제외 / 프패는 누락 검사에서 제외
+    const owner = normalizer($('ownerId')?.value || '');
+    const manualExcluded = new Set(parseIdList($('excludeIds')?.value || '', normalizer));
+    const manualFreePass = new Set(parseIdList($('freePassIds')?.value || '', normalizer));
+    const adminSet = new Set(isInstaMode ? INSTAGRAM_ADMIN_IDS.map(normalizeIg) : []);
+
+    let excludedCount=0;
+    let freePassCount=0;
+    let commentedCount=0;
+    const missing=[];
+
+    for(const person of participants){
+      const id=normalizer(person.norm || person.target);
+      if(!id) continue;
+
+      const isOwner = !!owner && id === owner;
+      const isAdmin = isInstaMode && adminSet.has(id);
+      const isManualExcluded = manualExcluded.has(id);
+      const isFreePass = !!person.autoFreePass || manualFreePass.has(id);
+
+      if(isOwner || isAdmin || isManualExcluded){
+        excludedCount++;
+        continue;
+      }
+      if(isFreePass){
+        freePassCount++;
+        continue;
+      }
+
+      if(recognized.has(id)) commentedCount++;
+      else missing.push(person.target || person.norm || id);
+    }
+
+    const requiredCount = participants.length - excludedCount - freePassCount;
+    currentMissing = [...new Set(missing.map(v=>normalizer(v)).filter(Boolean))];
+    lastRecognized = [...recognized];
+
+    $('statParticipants').textContent = String(requiredCount);
+    $('statCommented').textContent = String(commentedCount);
+    $('statMissing').textContent = String(currentMissing.length);
+    $('statExcluded').textContent = String(excludedCount);
+    $('statFreePass').textContent = String(freePassCount);
+    $('missingTitleCount').textContent = currentMissing.length + '명';
+    $('checkedPost').textContent = sourceLabel || '확인 완료';
+    $('checkedAt').textContent = new Date().toLocaleString('ko-KR', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+
+    $('missingList').innerHTML = currentMissing.length
+      ? currentMissing.map((id,i)=>`<div class="missing-item"><span>${i+1}</span><strong>${isInstaMode?'@':''}${esc(id)}</strong></div>`).join('')
+      : '<div class="all-clear">✅ 누락자가 없습니다.</div>';
+
+    $('recognizedCount').textContent = String(commentedCount);
+    $('recognizedCountMirror').textContent = commentedCount + '명 인식';
+    $('resultCard').classList.remove('hidden');
+    $('resultCard').scrollIntoView({behavior:'smooth',block:'start'});
   }
 
   async function copyMissing(){
