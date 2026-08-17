@@ -1,6 +1,6 @@
 window.YEOWOOBANG_CONFIG = {
-  API_URL: "https://script.google.com/macros/s/AKfycby2jcmEvTTbVJ9PpZ8jYI2703AQOeCj0KZ8d7Clun4as_lyPexxcmdfjgOZKdzFveaoyw/exec"
+  API_URL: "https://script.google.com/macros/s/AKfycbwO1A8OHL_Tw48uisPPVOLk4PbnOVyiQlnoJ6EivB6_FF0zTZKXJFY6OMrv78VNcaGMdQ/exec"
 ,
   SERVICE_NAME: "YEOWOOBANG CHECK",
-  BUILD: "v31-api-comments"
+  BUILD: "v32-facebook-comments-live"
 };
