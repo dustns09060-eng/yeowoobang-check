@@ -287,6 +287,61 @@
   }
 
 
+
+  // 참여 명단 입력 즉시 파싱 결과를 화면에 반영합니다.
+  // 예:
+  // 17. 다콩/yuyonyong
+  // https://www.instagram.com/p/...
+  // 18. 또용/dear_ddoyong
+  // URL 줄은 참여자로 세지 않습니다.
+  function renderParsed(){
+    const parsed = parseParticipants($('participants')?.value || '');
+    const items = Array.isArray(parsed.items) ? parsed.items : [];
+    const warnings = Array.isArray(parsed.warnings) ? parsed.warnings : [];
+
+    if($('recognizedCount')) {
+      $('recognizedCount').textContent = String(items.length);
+    }
+    if($('recognizedCountMirror')) {
+      $('recognizedCountMirror').textContent = `${items.length}명 인식`;
+    }
+    if($('warningCount')) {
+      $('warningCount').textContent = String(warnings.length);
+    }
+
+    if($('extractedList')){
+      $('extractedList').innerHTML = items.length
+        ? items.map((x,i)=>{
+            const id = mode === 'naver'
+              ? (x.target || x.norm || '')
+              : '@' + (x.target || x.norm || '');
+            const nick = x.nickname ? `<small>${esc(x.nickname)}</small>` : '';
+            return `<span class="id-chip"><b>${i+1}. ${esc(id)}</b>${nick}</span>`;
+          }).join('')
+        : '<small>인식된 참여자가 없습니다.</small>';
+    }
+
+    if($('parseWarningsWrap') && $('parseWarnings')){
+      if(warnings.length){
+        $('parseWarningsWrap').classList.remove('hidden');
+        $('parseWarnings').innerHTML = warnings
+          .slice(0,50)
+          .map(w=>`<div><b>${w.line || w.lineNo || ''}줄</b> ${esc(w.text || w.original || '')} · ${esc(w.reason || '확인 필요')}</div>`)
+          .join('');
+      }else{
+        $('parseWarningsWrap').classList.add('hidden');
+        $('parseWarnings').innerHTML = '';
+      }
+    }
+
+    return parsed;
+  }
+
+  // 예전 함수명과 호환
+  function updateParsedPreview(){
+    return renderParsed();
+  }
+
   async function backendApi(params){
     if(!cfg.API_URL) throw new Error('Apps Script API 주소가 설정되지 않았습니다.');
     const url=new URL(cfg.API_URL);
@@ -329,6 +384,10 @@
       const operationId=makeOperationId();
       const d=await backendApi({action:'comments',postUrl,operationId});
 
+      if(!d || typeof d !== 'object'){
+        throw new Error('API 응답이 비어 있습니다.');
+      }
+
       if(d.ok && Array.isArray(d.comments) && d.comments.length>0){
         const names=[...new Set(d.comments.map(c=>normalizeIg(c.username)).filter(Boolean))];
         status.className='hybrid-status success';
@@ -345,7 +404,8 @@
       }
 
       status.className='hybrid-status fallback';
-      status.innerHTML=`자동 조회를 사용할 수 없어요.<br><b>${d.message||'Meta API가 댓글 목록을 반환하지 않았습니다.'}</b><br>아래 화면 녹화·붙여넣기·캡처 중 하나로 이어서 확인해주세요.`;
+      const apiMessage=d.message||d.error||d.code||'Meta API가 댓글 목록을 반환하지 않았습니다.';
+      status.innerHTML=`자동 조회를 사용할 수 없어요.<br><b>${esc(apiMessage)}</b><br>아래 화면 녹화·붙여넣기·캡처 중 하나로 이어서 확인해주세요.`;
       activateInstagramFallback('API 응답이 비어 있어 화면 녹화 확인으로 자동 전환했습니다.');
     }catch(e){
       status.className='hybrid-status fallback';
@@ -1276,7 +1336,7 @@
   });
 
   $('backHomeBtn').addEventListener('click',goHome);
-  $('participants').addEventListener('input',renderParsed);
+  $('participants')?.addEventListener('input',renderParsed);
 
 
   $('voteImages').addEventListener('change',e=>{
@@ -1298,7 +1358,7 @@
     $('captureMatchedCount').textContent='0';
   });
 
-  $('hybridApiBtn').addEventListener('click',runHybridApiCheck);
+  $('hybridApiBtn')?.addEventListener('click',runHybridApiCheck);
 
   $('captureCheckBtn').addEventListener('click',()=>runCaptureCheck().catch(e=>alert(e.message)));
 
@@ -1315,7 +1375,7 @@
     selectMode(currentMode);
   });
 
-  $('showIdsBtn').addEventListener('click',()=>{
+  $('showIdsBtn')?.addEventListener('click',()=>{
     $('idDrawer').classList.toggle('hidden');
     $('showIdsBtn').textContent = $('idDrawer').classList.contains('hidden') ? '추출 결과 보기' : '접기';
   });
@@ -1332,4 +1392,7 @@
   });
 
   renderFileList();
+
+  // 초기 화면에서도 현재 입력값을 즉시 반영
+  try { renderParsed(); } catch(e) { console.warn('초기 명단 파싱 실패', e); }
 })();
