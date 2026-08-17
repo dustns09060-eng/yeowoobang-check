@@ -17,7 +17,7 @@
         <h1>품앗이 누락 확인</h1>
         <p>인스타그램과 네이버 블로그를 한 곳에서 확인해요.</p>
       </div>
-      <div class="hero-badge">BETA</div>
+      <div class="hero-badge">v1.0</div>
     </header>
 
     <section id="homeScreen" class="home-screen">
@@ -27,7 +27,7 @@
           <span>회원은 캡처 확인 · 관리자는 API 자동 확인 · 대량 댓글은 화면 녹화 수집</span>
         </div>
         <span class="service-chip">SERVICE BASE</span>
-      </div><div class="test-mode-banner"><strong>하이브리드 테스트 버전</strong><span>인스타 댓글은 API 자동 확인 → 안 되면 캡처 확인으로 전환됩니다.</span></div>
+      </div><div class="test-mode-banner production-banner"><strong>실사용 안정화 버전</strong><span>API 자동 확인 → 실패 시 화면 녹화(권장) → 텍스트 붙여넣기 → 캡처 순서로 확인합니다.</span></div>
       <div class="home-intro">
         <span>확인할 채널을 선택해주세요</span>
         <strong>어떤 방식으로 확인할까요?</strong>
@@ -38,8 +38,8 @@
           <div class="channel-icon">◎</div>
           <div class="channel-copy">
             <span>ADMIN ONLY</span>
-            <h2>관리자 댓글 자동 확인</h2>
-            <p>API가 연결된 관리자 계정만 게시물 링크로 자동 확인</p>
+            <h2>인스타 댓글 누락 확인</h2>
+            <p>게시물 링크 자동 확인 · 안 되면 화면 녹화/붙여넣기/캡처로 계속 확인</p>
           </div>
           <div class="channel-arrow">→</div>
         </button>
@@ -166,6 +166,62 @@
             <div id="moneExtractStatus" class="notice hidden"></div>
           </div>
 
+          <div class="helper-row">
+            <span id="recognizedCountMirror">0명 인식</span>
+            <button class="text-btn" type="button" id="showIdsBtn">추출 결과 보기</button>
+          </div>
+
+          <div id="idDrawer" class="drawer hidden">
+            <div id="extractedList" class="id-cloud"></div>
+          </div>
+
+          <div id="parseWarningsWrap" class="notice warning hidden">
+            <strong>확인 필요</strong>
+            <div id="parseWarnings"></div>
+          </div>
+        </section>
+
+        <section class="panel capture-panel">
+          <div class="panel-title">
+            <div class="num">B</div>
+            <div>
+              <h2 id="captureTitle">댓글 캡처</h2>
+              <p id="captureHelp">댓글 작성자 아이디가 보이게 여러 장 선택</p>
+            </div>
+          </div>
+
+          <div id="hybridApiBox" class="hybrid-api-box hidden">
+            <div class="hybrid-label">관리자 전용</div>
+            <strong>게시물 링크로 댓글 자동 확인</strong>
+            <p>API가 연결된 관리자 계정은 게시물 링크로 먼저 자동 확인합니다. Meta API가 댓글을 주지 않으면 아래 화면 녹화·붙여넣기·캡처로 바로 이어서 확인할 수 있어요.</p>
+            <input id="hybridPostUrl" type="url" inputmode="url" placeholder="https://www.instagram.com/p/...">
+            <button id="hybridApiBtn" class="run-btn api-run" type="button">API로 댓글 자동 확인</button>
+            <div id="hybridApiStatus" class="hybrid-status"></div>
+          </div>
+
+          <div id="instagramMethodGuide" class="method-guide hidden">
+            <div><span>⭐</span><b>프로페셔널 계정</b><small>게시물 링크로 API 자동 확인</small></div>
+            <div><span>📱</span><b>모바일 인스타 앱</b><small>댓글 캡처해서 확인</small></div>
+            <div><span>💻</span><b>PC · 모바일 웹</b><small>복사가 되면 댓글 붙여넣기</small></div>
+          </div>
+          <div id="captureFallbackTitle" class="fallback-title hidden">
+            <span>대체 방법</span><strong>화면 녹화 · 붙여넣기 · 캡처</strong>
+          </div>
+
+          <div id="instagramFallbackFlow" class="fallback-flow hidden">
+            <div class="fallback-flow-head">
+              <span>API가 안 되면</span>
+              <strong>아래 방법 중 편한 방법 하나만 사용하세요.</strong>
+            </div>
+            <div class="fallback-steps">
+              <span><b>1</b> 화면 녹화 <em>권장 · 대량 댓글</em></span>
+              <span><b>2</b> 댓글 텍스트 붙여넣기 <em>PC/웹</em></span>
+              <span><b>3</b> 캡처 여러 장 <em>마지막 대체</em></span>
+            </div>
+          </div>
+
+
+
           <div id="collectorVideoBox" class="collector-video-box hidden">
             <div class="collector-title">
               <span class="collector-badge">대량 댓글</span>
@@ -219,47 +275,19 @@
             </div>
           </div>
 
-          <div class="helper-row">
-            <span id="recognizedCountMirror">0명 인식</span>
-            <button class="text-btn" type="button" id="showIdsBtn">추출 결과 보기</button>
-          </div>
+          
 
-          <div id="idDrawer" class="drawer hidden">
-            <div id="extractedList" class="id-cloud"></div>
-          </div>
-
-          <div id="parseWarningsWrap" class="notice warning hidden">
-            <strong>확인 필요</strong>
-            <div id="parseWarnings"></div>
-          </div>
-        </section>
-
-        <section class="panel capture-panel">
-          <div class="panel-title">
-            <div class="num">B</div>
-            <div>
-              <h2 id="captureTitle">댓글 캡처</h2>
-              <p id="captureHelp">댓글 작성자 아이디가 보이게 여러 장 선택</p>
+          <div id="commentPasteBox" class="comment-paste-box hidden">
+            <div class="paste-title">
+              <span class="collector-badge">복사 가능할 때</span>
+              <strong>댓글 텍스트 붙여넣기</strong>
             </div>
+            <p>PC나 모바일 웹에서 댓글을 복사할 수 있으면 그대로 붙여넣으세요. 참여 명단에 있는 Instagram 아이디만 찾아 비교합니다.</p>
+            <textarea id="commentPasteText" rows="7" placeholder="복사한 댓글 내용을 여기에 붙여넣기"></textarea>
+            <button id="commentPasteCheckBtn" class="run-btn secondary-run" type="button">붙여넣은 댓글로 누락 확인</button>
+            <div id="commentPasteStatus" class="hybrid-status"></div>
           </div>
 
-          <div id="hybridApiBox" class="hybrid-api-box hidden">
-            <div class="hybrid-label">관리자 전용</div>
-            <strong>게시물 링크로 댓글 자동 확인</strong>
-            <p>API가 연결된 관리자 계정에서만 사용할 수 있어요. 자동 조회가 안 되면 댓글 캡처 확인을 사용해주세요.</p>
-            <input id="hybridPostUrl" type="url" inputmode="url" placeholder="https://www.instagram.com/p/...">
-            <button id="hybridApiBtn" class="run-btn api-run" type="button">API로 댓글 자동 확인</button>
-            <div id="hybridApiStatus" class="hybrid-status"></div>
-          </div>
-
-          <div id="instagramMethodGuide" class="method-guide hidden">
-            <div><span>⭐</span><b>프로페셔널 계정</b><small>게시물 링크로 API 자동 확인</small></div>
-            <div><span>📱</span><b>모바일 인스타 앱</b><small>댓글 캡처해서 확인</small></div>
-            <div><span>💻</span><b>PC · 모바일 웹</b><small>복사가 되면 댓글 붙여넣기</small></div>
-          </div>
-          <div id="captureFallbackTitle" class="fallback-title hidden">
-            <span>또는</span><strong>댓글 캡처로 확인</strong>
-          </div>
 
           <label class="dropzone" for="commentImages">
             <span class="camera">＋</span>
@@ -361,7 +389,7 @@
       </section>
     </section>
 
-    <footer>YEOWOOBANG CHECK · 캡처 기반 품앗이 확인</footer>
+    <footer>YEOWOOBANG CHECK · 실사용 안정화 v1.0</footer>
   
     <section class="service-note">
       <strong>운영 원칙</strong>
@@ -371,7 +399,7 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-  <script src="./config.js?v=25"></script>
-  <script src="./app.js?v=25"></script>
+  <script src="./config.js?v=30"></script>
+  <script src="./app.js?v=30"></script>
 </body>
 </html>

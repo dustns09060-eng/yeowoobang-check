@@ -146,15 +146,17 @@
     $('ocrHint').textContent = c.ocrHint;
     $('likeRosterBox').classList.toggle('hidden', mode !== 'like');
     $('moneWorkflowBox').classList.toggle('hidden', mode !== 'mone');
-    const isCollector = mode === 'collector';
-    $('collectorVideoBox').classList.toggle('hidden', !isCollector);
+    const showVideoFallback = (mode === 'collector' || mode === 'instagram');
+    $('collectorVideoBox').classList.toggle('hidden', !showVideoFallback);
+    $('commentPasteBox')?.classList.toggle('hidden', !(mode === 'instagram' || mode === 'personal' || mode === 'collector'));
+    $('instagramFallbackFlow')?.classList.toggle('hidden', mode !== 'instagram');
 
     $('hybridApiBox').classList.toggle('hidden', mode !== 'instagram');
     $('instagramMethodGuide').classList.add('hidden');
     $('captureFallbackTitle').classList.toggle('hidden', mode !== 'instagram');
     if(mode === 'instagram'){
       $('captureTitle').textContent='댓글 캡처 대체 확인';
-      $('captureHelp').textContent='API 자동 확인이 안 될 때 댓글 작성자 아이디가 보이도록 캡처해서 확인하세요.';
+      $('captureHelp').textContent='API가 안 되면 화면 녹화(권장), 댓글 붙여넣기, 캡처 중 편한 방법으로 확인하세요.';
     }
     if(mode === 'personal'){
       $('captureTitle').textContent='댓글 캡처';
@@ -337,20 +339,72 @@
 
       if(d.ok && Number(d.instagramCommentCount||d.commentCount||0)===0){
         status.className='hybrid-status warning';
-        status.textContent='API 기준 댓글이 0개입니다. 실제 댓글이 있다면 아래 캡처 방식으로 확인해주세요.';
+        status.textContent='API가 댓글 목록을 확인하지 못했습니다. 아래 화면 녹화 방식으로 이어서 확인해주세요.';
+        activateInstagramFallback('API 대신 화면 녹화로 확인할 수 있어요. 댓글을 끝까지 펼치고 천천히 스크롤해주세요.');
         return;
       }
 
       status.className='hybrid-status fallback';
-      status.innerHTML=`자동 조회를 사용할 수 없어요.<br><b>${d.message||'Meta API가 댓글 목록을 반환하지 않았습니다.'}</b><br>아래 댓글 캡처 방식으로 확인해주세요.`;
+      status.innerHTML=`자동 조회를 사용할 수 없어요.<br><b>${d.message||'Meta API가 댓글 목록을 반환하지 않았습니다.'}</b><br>아래 화면 녹화·붙여넣기·캡처 중 하나로 이어서 확인해주세요.`;
+      activateInstagramFallback('API 응답이 비어 있어 화면 녹화 확인으로 자동 전환했습니다.');
     }catch(e){
       status.className='hybrid-status fallback';
       logLocalEvent('api_error',e.message||e);
-      status.innerHTML=`API 자동 확인에 실패했어요.<br><b>${String(e.message||e)}</b><br>아래 댓글 캡처 방식으로 확인할 수 있어요.`;
+      status.innerHTML=`API 자동 확인에 실패했어요.<br><b>${String(e.message||e)}</b><br>아래 화면 녹화·붙여넣기·캡처 중 하나로 이어서 확인할 수 있어요.`;
+      activateInstagramFallback('API 연결 실패로 화면 녹화 확인으로 자동 전환했습니다.');
     }finally{
       btn.disabled=false;
       btn.textContent='API로 댓글 자동 확인';
     }
+  }
+
+
+  function activateInstagramFallback(message){
+    if(mode !== 'instagram') return;
+    $('collectorVideoBox')?.classList.remove('hidden');
+    $('commentPasteBox')?.classList.remove('hidden');
+    $('instagramFallbackFlow')?.classList.remove('hidden');
+
+    if(message && $('videoHint')){
+      $('videoHint').textContent = message;
+    }
+
+    const target = $('collectorVideoBox');
+    if(target){
+      target.classList.add('fallback-active');
+      setTimeout(()=>target.classList.remove('fallback-active'), 2400);
+      target.scrollIntoView({behavior:'smooth', block:'center'});
+    }
+  }
+
+  function runPastedCommentCheck(){
+    if(!(mode === 'instagram' || mode === 'personal' || mode === 'collector')) return;
+
+    const parsed = parseParticipants($('participants').value);
+    if(!parsed.items.length){
+      alert('참여자 명단을 먼저 입력해주세요.');
+      return;
+    }
+
+    const text = String($('commentPasteText')?.value || '').trim();
+    if(!text){
+      alert('복사한 댓글 내용을 먼저 붙여넣어주세요.');
+      return;
+    }
+
+    const recognized = recognizeInstagram(text, parsed.items);
+    const unique = [...new Set(recognized.map(normalizeIg).filter(Boolean))];
+    const status = $('commentPasteStatus');
+
+    if(!unique.length){
+      status.className='hybrid-status warning';
+      status.textContent='참여 명단과 일치하는 Instagram 아이디를 찾지 못했습니다. 복사 범위를 확인해주세요.';
+      return;
+    }
+
+    status.className='hybrid-status success';
+    status.textContent=`붙여넣기 확인 완료 · ${unique.length}명 인식`;
+    runComparison(recognized, '댓글 텍스트 붙여넣기 확인');
   }
 
 
@@ -1064,6 +1118,8 @@
     $('videoRecognizedWrap')?.classList.add('hidden');
     if($('hybridPostUrl')) $('hybridPostUrl').value='';
     if($('hybridApiStatus')) { $('hybridApiStatus').textContent=''; $('hybridApiStatus').className='hybrid-status'; }
+    if($('commentPasteText')) $('commentPasteText').value='';
+    if($('commentPasteStatus')) { $('commentPasteStatus').textContent=''; $('commentPasteStatus').className='hybrid-status'; }
 
 
     ['ocrProgressWrap','ocrResultFold','resultCard','idDrawer','parseWarningsWrap'].forEach(id=>{
@@ -1136,6 +1192,7 @@
 
   $('videoAnalyzeBtn').addEventListener('click',analyzeCommentVideo);
   $('videoCompareBtn').addEventListener('click',compareVideoRecognized);
+  $('commentPasteCheckBtn')?.addEventListener('click',runPastedCommentCheck);
 
   document.querySelectorAll('.channel-card').forEach(btn=>{
     btn.addEventListener('click',()=>selectMode(btn.dataset.mode));
