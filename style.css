@@ -342,3 +342,15 @@ footer{text-align:center;color:#918d85;font-size:9px;padding:24px 0 0}
 .fallback-active{animation:fallbackPulse .8s ease-in-out 2}
 @keyframes fallbackPulse{50%{box-shadow:0 0 0 5px rgba(32,74,61,.12);transform:translateY(-1px)}}
 @media (min-width:760px){.fallback-steps{grid-template-columns:repeat(3,1fr)}}
+
+
+/* ===== 회원별 Instagram 연결 ===== */
+.member-ig-connect{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;margin:14px 0 16px;padding:14px;border:1px solid rgba(31,92,74,.18);border-radius:16px;background:rgba(255,255,255,.72)}
+.member-ig-connect>div{min-width:0;display:flex;flex-direction:column;gap:3px}
+.member-ig-connect small{font-size:12px;color:#7b7b73}
+.member-ig-connect b{font-size:18px;color:#272822;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.member-ig-connect b.connected{color:#1f5c4a}
+.member-ig-connect span{font-size:12px;line-height:1.45;color:#77746c}
+.member-ig-connect button{border:0;border-radius:12px;padding:12px 14px;font-weight:800;white-space:nowrap;background:#1f5c4a;color:#fff}
+.member-ig-connect .disconnect-btn{grid-column:2;background:#eee8df;color:#655f57;padding:9px 12px}
+@media(max-width:560px){.member-ig-connect{grid-template-columns:1fr}.member-ig-connect button,.member-ig-connect .disconnect-btn{grid-column:1;width:100%}}

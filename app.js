@@ -11,6 +11,9 @@
   let selectedCommentVideo = null;
   let videoRecognized = [];
   let videoReview = [];
+  const MEMBER_CLIENT_STORAGE_KEY = 'yeowoobang_member_instagram_client_v1';
+  let memberInstagramConnected = false;
+  let memberInstagramUsername = '';
 
   // 여우방 운영진: Instagram 검사 시 자동 제외
   const INSTAGRAM_ADMIN_IDS = [
@@ -33,6 +36,87 @@
     .replace(/l/g,'1')
     .replace(/0/g,'o');
   const isIg = s => /^[a-z0-9._]{1,30}$/i.test(s||'');
+
+  function getMemberClientId(){
+    let id='';
+    try{id=String(localStorage.getItem(MEMBER_CLIENT_STORAGE_KEY)||'').trim();}catch(_){}
+    if(/^[A-Za-z0-9._:-]{8,120}$/.test(id)) return id;
+    const rnd=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():`${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    id=('yb-'+rnd).replace(/[^A-Za-z0-9._:-]/g,'').slice(0,120);
+    try{localStorage.setItem(MEMBER_CLIENT_STORAGE_KEY,id);}catch(_){}
+    return id;
+  }
+
+  async function refreshMemberInstagramStatus(showMessage=false){
+    const state=$('memberIgState');
+    const help=$('memberIgHelp');
+    const btn=$('memberIgConnectBtn');
+    const disconnect=$('memberIgDisconnectBtn');
+    if(!state) return null;
+    try{
+      const d=await backendApi({action:'memberAuthStatus',clientId:getMemberClientId()});
+      memberInstagramConnected=!!d.connected;
+      memberInstagramUsername=normalizeIg(d.username||'');
+      if(d.connected){
+        state.textContent='@'+(memberInstagramUsername||'연결됨');
+        state.classList.add('connected');
+        if(help) help.textContent='내 계정의 게시물 링크를 넣으면 댓글을 자동 확인할 수 있어요.';
+        if(btn) btn.textContent='Instagram 재연결';
+        if(disconnect) disconnect.classList.remove('hidden');
+        if(memberInstagramUsername && $('ownerId')) $('ownerId').value=memberInstagramUsername;
+        if(showMessage) alert('@'+memberInstagramUsername+' Instagram 연결이 완료되었습니다.');
+      }else{
+        state.textContent='연결된 계정 없음';
+        state.classList.remove('connected');
+        if(help) help.textContent='회원 본인의 프로페셔널 Instagram 계정을 먼저 연결해주세요.';
+        if(btn) btn.textContent='Instagram 연결';
+        if(disconnect) disconnect.classList.add('hidden');
+      }
+      return d;
+    }catch(e){
+      memberInstagramConnected=false;
+      state.textContent='연결 상태 확인 실패';
+      if(help) help.textContent=String(e.message||e);
+      return null;
+    }
+  }
+
+  async function connectMemberInstagram(){
+    const btn=$('memberIgConnectBtn');
+    try{
+      if(btn){btn.disabled=true;btn.textContent='연결 준비 중...';}
+      const d=await backendApi({action:'memberAuthStart',clientId:getMemberClientId()});
+      if(!d.authUrl) throw new Error('Instagram 로그인 주소를 받지 못했습니다.');
+      window.location.assign(d.authUrl);
+    }catch(e){
+      alert('Instagram 연결 시작 실패: '+String(e.message||e));
+      if(btn){btn.disabled=false;btn.textContent='Instagram 연결';}
+    }
+  }
+
+  async function disconnectMemberInstagram(){
+    if(!confirm('이 기기의 Instagram 연결을 해제할까요?')) return;
+    try{
+      await backendApi({action:'memberDisconnect',clientId:getMemberClientId()});
+      memberInstagramConnected=false;
+      memberInstagramUsername='';
+      await refreshMemberInstagramStatus(false);
+    }catch(e){ alert('연결 해제 실패: '+String(e.message||e)); }
+  }
+
+  function handleMemberOAuthReturn(){
+    const params=new URLSearchParams(location.search);
+    if(params.get('pumasi_oauth')!=='success') return false;
+    const username=normalizeIg(params.get('username')||'');
+    params.delete('pumasi_oauth'); params.delete('username');
+    const clean=location.pathname+(params.toString()?('?'+params.toString()):'')+location.hash;
+    try{history.replaceState({},document.title,clean);}catch(_){}
+    memberInstagramConnected=true;
+    memberInstagramUsername=username;
+    // OAuth 복귀 시 바로 Instagram 댓글 확인 화면을 엽니다.
+    setTimeout(()=>{ selectMode('instagram'); refreshMemberInstagramStatus(true); },0);
+    return true;
+  }
 
   function configForMode(){
     if(mode === 'collector'){
@@ -155,6 +239,7 @@
     $('instagramMethodGuide').classList.add('hidden');
     $('captureFallbackTitle').classList.toggle('hidden', mode !== 'instagram');
     if(mode === 'instagram'){
+      refreshMemberInstagramStatus(false).catch(()=>{});
       $('captureTitle').textContent='댓글 캡처 대체 확인';
       $('captureHelp').textContent='API가 안 되면 화면 녹화(권장), 댓글 붙여넣기, 캡처 중 편한 방법으로 확인하세요.';
     }
@@ -185,6 +270,16 @@
     $('checkScreen').classList.add('hidden');
     $('homeScreen').classList.remove('hidden');
   }
+
+  // 채널 다시 선택 버튼: 초기화 코드 일부에서 오류가 나더라도 항상 동작하도록
+  // 문서 전체 클릭 위임으로 먼저 연결합니다. 모바일 터치/동적 렌더링에도 안전합니다.
+  document.addEventListener('click', (e)=>{
+    const backBtn = e.target && e.target.closest ? e.target.closest('#backHomeBtn') : null;
+    if(!backBtn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    goHome();
+  });
 
 
   function normalizeNickname(s){
@@ -382,7 +477,9 @@
 
     try{
       const operationId=makeOperationId();
-      const d=await backendApi({action:'comments',postUrl,operationId});
+      if(!memberInstagramConnected){ await refreshMemberInstagramStatus(false); }
+      if(!memberInstagramConnected) throw new Error('먼저 Instagram 계정을 연결해주세요.');
+      const d=await backendApi({action:'memberComments',clientId:getMemberClientId(),postUrl,operationId});
 
       if(!d || typeof d !== 'object'){
         throw new Error('API 응답이 비어 있습니다.');
@@ -1335,7 +1432,6 @@
     btn.addEventListener('click',()=>selectMode(btn.dataset.mode));
   });
 
-  $('backHomeBtn').addEventListener('click',goHome);
   $('participants')?.addEventListener('input',renderParsed);
 
 
@@ -1358,6 +1454,8 @@
     $('captureMatchedCount').textContent='0';
   });
 
+  $('memberIgConnectBtn')?.addEventListener('click',connectMemberInstagram);
+  $('memberIgDisconnectBtn')?.addEventListener('click',disconnectMemberInstagram);
   $('hybridApiBtn')?.addEventListener('click',runHybridApiCheck);
 
   $('captureCheckBtn').addEventListener('click',()=>runCaptureCheck().catch(e=>alert(e.message)));
@@ -1392,6 +1490,7 @@
   });
 
   renderFileList();
+  handleMemberOAuthReturn();
 
   // 초기 화면에서도 현재 입력값을 즉시 반영
   try { renderParsed(); } catch(e) { console.warn('초기 명단 파싱 실패', e); }
