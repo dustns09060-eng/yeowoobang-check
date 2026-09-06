@@ -177,6 +177,11 @@
     $('ownerId').value = localStorage.getItem(key) || ((mode === 'instagram'||mode === 'personal'||mode === 'like'||mode === 'mone') ? 'tlso_94' : '');
 
     resetCheckOnly();
+
+    // 인스타 댓글 확인 화면을 열 때마다 연결 상태 재확인
+    if(mode === 'instagram'){
+      setTimeout(()=>refreshMemberIgStatus(false).catch(()=>{}),0);
+    }
   }
 
   function goHome(){
@@ -287,19 +292,41 @@
   }
 
 
-  async function backendApi(params){
+  async function backendApi(params, timeoutMs=10000){
     if(!cfg.API_URL) throw new Error('Apps Script API 주소가 설정되지 않았습니다.');
+
     const url=new URL(cfg.API_URL);
-    Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,String(v)));
+    Object.entries(params).forEach(([k,v])=>{
+      if(v!==undefined && v!==null) url.searchParams.set(k,String(v));
+    });
     url.searchParams.set('_',Date.now());
 
-    const res=await fetch(url.toString(),{method:'GET',redirect:'follow'});
-    const text=await res.text();
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),timeoutMs);
 
     try{
-      return JSON.parse(text);
+      const res=await fetch(url.toString(),{
+        method:'GET',
+        cache:'no-store',
+        redirect:'follow',
+        signal:controller.signal
+      });
+
+      if(!res.ok) throw new Error(`API HTTP ${res.status}`);
+
+      const body=await res.text();
+      try{
+        return JSON.parse(body);
+      }catch(e){
+        throw new Error('API 응답이 JSON이 아닙니다. Apps Script 웹앱 배포 주소와 실행 권한을 확인해주세요.');
+      }
     }catch(e){
-      throw new Error('API 응답을 읽지 못했습니다. Apps Script 배포 상태를 확인해주세요.');
+      if(e?.name==='AbortError'){
+        throw new Error(`API 응답 시간 초과 (${Math.round(timeoutMs/1000)}초)`);
+      }
+      throw e;
+    }finally{
+      clearTimeout(timer);
     }
   }
 
@@ -358,17 +385,39 @@
   }
 
   async function refreshMemberIgStatus(showMessage=false){
-    if(!$('memberIgState')) return null;
+    const state=$('memberIgState');
+    const help=$('memberIgHelp');
+    const connect=$('memberIgConnectBtn');
+    if(!state) return null;
+
+    state.textContent='연결 상태 확인 중...';
+    if(help) help.textContent='Instagram 연결 상태를 확인하고 있어요.';
+    if(connect) connect.disabled=true;
+
     try{
-      const data=await backendApi({action:'memberAuthStatus',clientId:getMemberClientId()});
-      if(data&&data.ok===false) throw new Error(data.message||data.error||'연결 상태 확인 실패');
-      setMemberIgUi(data||{});
-      if(showMessage && data?.connected) alert(`Instagram @${normalizeIg(data.username)} 연결 완료`);
+      const data=await backendApi(
+        {action:'memberAuthStatus',clientId:getMemberClientId()},
+        10000
+      );
+      if(data&&data.ok===false){
+        throw new Error(data.message||data.error||'연결 상태 확인 실패');
+      }
+
+      setMemberIgUi(data||{connected:false});
+
+      if(showMessage && data?.connected){
+        alert(`Instagram @${normalizeIg(data.username)} 연결 완료`);
+      }
       return data;
     }catch(e){
-      $('memberIgState').textContent='연결 상태 확인 실패';
-      if($('memberIgHelp')) $('memberIgHelp').textContent=String(e.message||e);
+      state.textContent='연결 상태 확인 실패';
+      if(help){
+        help.textContent=`${String(e.message||e)} · Instagram 연결 버튼으로 다시 시도할 수 있어요.`;
+      }
+      if(connect) connect.textContent='Instagram 연결';
       return null;
+    }finally{
+      if(connect) connect.disabled=false;
     }
   }
 
@@ -1431,9 +1480,7 @@
   const oauthReturned=handleMemberOAuthReturn();
   if(oauthReturned){
     selectMode('instagram');
-    refreshMemberIgStatus(true).catch(()=>{});
-  }else{
-    refreshMemberIgStatus(false).catch(()=>{});
+    setTimeout(()=>refreshMemberIgStatus(true).catch(()=>{}),250);
   }
 
   renderFileList();
