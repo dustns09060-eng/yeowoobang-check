@@ -425,12 +425,17 @@
     const btn=$('memberIgConnectBtn');
     const status=$('hybridApiStatus');
     try{
+      // 모바일 Safari/Chrome에서도 첫 탭을 확실히 인식하도록 즉시 상태 변경
       if(btn){ btn.disabled=true; btn.textContent='연결 준비 중...'; }
       if(status){ status.className='hybrid-status checking'; status.textContent='Instagram 로그인 페이지를 준비하는 중...'; }
-      const data=await backendApi({action:'memberAuthStart',clientId:getMemberClientId()});
+
+      const data=await backendApi({action:'memberAuthStart',clientId:getMemberClientId()},15000);
       if(data&&data.ok===false) throw new Error(data.message||data.error||'Instagram 연결 시작 실패');
-      if(!data?.authUrl) throw new Error('Instagram 로그인 주소를 받지 못했습니다.');
-      window.location.assign(data.authUrl);
+      const authUrl=String(data?.authUrl||'').trim();
+      if(!/^https:\/\//i.test(authUrl)) throw new Error('Instagram 로그인 주소를 받지 못했습니다.');
+
+      // assign 대신 href 사용: iOS/Android 인앱 브라우저에서도 가장 안정적으로 이동
+      window.location.href=authUrl;
     }catch(e){
       if(status){ status.className='hybrid-status fallback'; status.textContent='Instagram 연결 시작 실패 · '+String(e.message||e); }
       alert('Instagram 연결 시작 실패: '+String(e.message||e));
@@ -1463,7 +1468,7 @@
     $('captureMatchedCount').textContent='0';
   });
 
-  $('memberIgConnectBtn')?.addEventListener('click',startMemberInstagramConnect);
+  $('memberIgConnectBtn')?.addEventListener('click',(e)=>{ e.preventDefault(); e.stopPropagation(); startMemberInstagramConnect(); });
   $('memberIgDisconnectBtn')?.addEventListener('click',disconnectMemberInstagram);
   $('hybridApiBtn')?.addEventListener('click',runHybridApiCheck);
 
