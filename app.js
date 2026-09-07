@@ -2,6 +2,19 @@
   const $ = id => document.getElementById(id);
   const cfg = window.YEOWOOBANG_CONFIG || {};
 
+  // Instagram 연결 버튼은 초기화 중 다른 UI 오류가 있어도 항상 동작하도록
+  // 문서 레벨에서 먼저 클릭을 받는다. (모바일 포함)
+  document.addEventListener('click', (event) => {
+    const btn = event.target?.closest?.('#memberIgConnectBtn');
+    if(!btn) return;
+    event.preventDefault();
+    event.stopPropagation();
+    startMemberInstagramConnect().catch(err => {
+      console.error('Instagram connect failed:', err);
+      alert('Instagram 연결 시작 실패: ' + String(err?.message || err));
+    });
+  }, true);
+
   let mode = null;
   let currentMissing = [];
   let selectedFiles = [];
@@ -178,9 +191,10 @@
 
     resetCheckOnly();
 
-    // 인스타 댓글 확인 화면을 열 때마다 연결 상태 재확인
+    // 화면 진입 직후 연결 버튼은 즉시 사용할 수 있게 유지합니다.
+    // 연결 상태 확인은 백그라운드에서 실행하되 버튼을 잠그지 않습니다.
     if(mode === 'instagram'){
-      setTimeout(()=>refreshMemberIgStatus(false).catch(()=>{}),0);
+      setTimeout(()=>refreshMemberIgStatus(false, true).catch(()=>{}),0);
     }
   }
 
@@ -384,7 +398,7 @@
     }
   }
 
-  async function refreshMemberIgStatus(showMessage=false){
+  async function refreshMemberIgStatus(showMessage=false, keepConnectEnabled=false){
     const state=$('memberIgState');
     const help=$('memberIgHelp');
     const connect=$('memberIgConnectBtn');
@@ -392,7 +406,7 @@
 
     state.textContent='연결 상태 확인 중...';
     if(help) help.textContent='Instagram 연결 상태를 확인하고 있어요.';
-    if(connect) connect.disabled=true;
+    if(connect && !keepConnectEnabled) connect.disabled=true;
 
     try{
       const data=await backendApi(
@@ -425,17 +439,12 @@
     const btn=$('memberIgConnectBtn');
     const status=$('hybridApiStatus');
     try{
-      // 모바일 Safari/Chrome에서도 첫 탭을 확실히 인식하도록 즉시 상태 변경
       if(btn){ btn.disabled=true; btn.textContent='연결 준비 중...'; }
       if(status){ status.className='hybrid-status checking'; status.textContent='Instagram 로그인 페이지를 준비하는 중...'; }
-
-      const data=await backendApi({action:'memberAuthStart',clientId:getMemberClientId()},15000);
+      const data=await backendApi({action:'memberAuthStart',clientId:getMemberClientId()});
       if(data&&data.ok===false) throw new Error(data.message||data.error||'Instagram 연결 시작 실패');
-      const authUrl=String(data?.authUrl||'').trim();
-      if(!/^https:\/\//i.test(authUrl)) throw new Error('Instagram 로그인 주소를 받지 못했습니다.');
-
-      // assign 대신 href 사용: iOS/Android 인앱 브라우저에서도 가장 안정적으로 이동
-      window.location.href=authUrl;
+      if(!data?.authUrl) throw new Error('Instagram 로그인 주소를 받지 못했습니다.');
+      window.location.assign(data.authUrl);
     }catch(e){
       if(status){ status.className='hybrid-status fallback'; status.textContent='Instagram 연결 시작 실패 · '+String(e.message||e); }
       alert('Instagram 연결 시작 실패: '+String(e.message||e));
@@ -1468,7 +1477,7 @@
     $('captureMatchedCount').textContent='0';
   });
 
-  $('memberIgConnectBtn')?.addEventListener('click',(e)=>{ e.preventDefault(); e.stopPropagation(); startMemberInstagramConnect(); });
+  // memberIgConnectBtn은 상단의 위임 이벤트에서 처리
   $('memberIgDisconnectBtn')?.addEventListener('click',disconnectMemberInstagram);
   $('hybridApiBtn')?.addEventListener('click',runHybridApiCheck);
 
